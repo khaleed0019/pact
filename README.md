@@ -101,8 +101,9 @@ store is seeded with three demo agreements, and the Pact Builder falls back to a
 deterministic reader when no AI key is present. Nothing is stubbed out or mocked away —
 the same code paths run either way.
 
-Add an `ANTHROPIC_API_KEY` to `.env.local` to switch the Builder, Smart Review and Explain
-onto the model. See [`.env.example`](.env.example).
+Add a `GEMINI_API_KEY` (or `ANTHROPIC_API_KEY`) to `.env.local` to switch the Builder,
+Smart Review and Explain onto a model, and `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` to
+switch onto Postgres. See [`.env.example`](.env.example).
 
 ### Testing inside Nimiq Pay
 
@@ -166,8 +167,8 @@ components/
 lib/
   nimiq/            The only place the wallet providers are touched
   pact/             Pure domain logic — state machine, digest, money
-  ai/               Server-side model calls + deterministic fallback
-  db/               Repository interface + in-process store + demo seed
+  ai/               Model calls (Gemini or Anthropic) + deterministic fallback
+  db/               Repository interface, in-process store, Postgres adapter, demo seed
 supabase/migrations Complete Postgres schema
 ```
 
@@ -188,21 +189,44 @@ supabase/migrations Complete Postgres schema
   trusted from the request body.
 - AI output is parsed with Zod and discarded if it does not fit. Nothing a model returns
   is written straight to storage.
-- No secrets reach the browser. `lib/ai/client.ts` is `server-only`, so an accidental
-  client import is a build error rather than a leaked key.
+- No secrets reach the browser. `lib/ai/providers.ts`, `lib/db/*` and `lib/auth/session.ts`
+  are all `server-only`, so an accidental client import is a build error rather than a
+  leaked key.
 
-### Persistence — current status
+### Persistence
 
-PACT runs on an **in-process store**. It is correct for local development and the demo,
-and it does not survive a server restart.
+Two interchangeable stores behind one interface:
 
-The Postgres schema is written and reviewable in
-[`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql) — 12 tables plus a
-derived `trust_metrics` view, RLS on everywhere, and a database-level constraint that a
-payment cannot be marked sent or confirmed without a transaction reference. The adapter
-implementing the repository interface against it is **not written yet**; that is stated
-here and in `lib/db/index.ts` rather than hinted at, because a deployed app quietly losing
-agreements would be exactly the kind of failure this product exists to prevent.
+- **In-process** by default. Seeded with the demo scenarios so a fresh clone with an empty
+  `.env` is already a working product. It does not survive a restart, and the app says so
+  in a banner rather than letting you find out later.
+- **Supabase Postgres** when `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set.
+
+The schema is in [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql):
+12 tables plus a derived `trust_metrics` view, RLS enabled on every table with **no
+policies at all** (Postgres denies by default, and authorisation lives in the server
+routes rather than in RLS), and indexes on every foreign key.
+
+Everything lives in a dedicated `pact` schema rather than `public`, so the migration is
+safe to apply inside a Supabase project that is already running another app — nothing
+collides, and `drop schema pact cascade` reverses it completely.
+
+Two invariants are enforced by the database itself, not just by application code:
+
+```sql
+-- a payment cannot be recorded as sent or confirmed without a transaction reference
+constraint settled_payments_have_a_reference check (
+  status not in ('SUBMITTED', 'CONFIRMED') or tx_reference is not null
+)
+
+-- one reminder per person, per agreement, per reason. ever.
+constraint one_nudge_per_reason unique (address, pact_id, kind)
+```
+
+`trust_metrics` is deliberately a **view**, not a table. Reputation has to be a function
+of what actually happened; a table would be a second copy of the truth that can drift from
+the rows it summarises, and a reputation number that disagrees with the history behind it
+is worse than no number at all.
 
 ---
 

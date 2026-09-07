@@ -15,7 +15,6 @@
     "verify": "npm run typecheck && npm run check:honesty && npm run test"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.68.0",
     "@nimiq/mini-app-sdk": "^0.1.0",
     "@noble/curves": "^1.9.1",
     "@noble/hashes": "^1.8.0",

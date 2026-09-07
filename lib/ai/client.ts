@@ -1,5 +1,4 @@
 import 'server-only'
-import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import {
   explanationSchema,
@@ -11,6 +10,7 @@ import {
   type Review,
 } from './schema.ts'
 import { heuristicExplain, heuristicExtract, heuristicReview } from './fallback.ts'
+import { activeBackend, askForJson } from './providers.ts'
 import type { Currency } from '../pact/types.ts'
 
 /**
@@ -29,26 +29,21 @@ import type { Currency } from '../pact/types.ts'
  *     tell the user which one they got.
  */
 
-const MODEL = 'claude-sonnet-5'
-const TIMEOUT_MS = 20_000
-
-function client(): Anthropic | null {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) return null
-  return new Anthropic({ apiKey, timeout: TIMEOUT_MS, maxRetries: 1 })
-}
-
+/** True when a model is configured. The UI uses this only to set expectations. */
 export function isModelConfigured(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY)
+  return activeBackend() !== 'none'
 }
 
 /**
- * Ask the model for one structured answer.
+ * Ask the model for one structured answer, then refuse to trust it.
  *
- * `tool_choice` forces a call to the single declared tool, which is how we get JSON
- * rather than prose. `input_schema` is hand-written JSON Schema mirroring the Zod type —
- * they are asserted to agree by the parse on the way out, so drift shows up as a
- * fallback rather than as corrupt data.
+ * The schema is enforced twice: once by the provider (a forced tool call for Anthropic,
+ * `responseSchema` for Gemini) and again by Zod here. The second pass is the one that
+ * matters — a provider can drift, add a field, or return a plausible-looking object with
+ * the wrong shape, and none of that is allowed anywhere near a stored agreement.
+ *
+ * Any failure returns `null`, which the callers below turn into the deterministic
+ * reader. There is no path where a user is left without an answer.
  */
 async function structured<S extends z.ZodTypeAny>(input: {
   system: string
@@ -58,38 +53,21 @@ async function structured<S extends z.ZodTypeAny>(input: {
   inputSchema: Record<string, unknown>
   schema: S
 }): Promise<z.output<S> | null> {
-  const anthropic = client()
-  if (!anthropic) return null
+  const raw = await askForJson({
+    system: input.system,
+    prompt: input.prompt,
+    schema: input.inputSchema,
+    toolName: input.toolName,
+    toolDescription: input.toolDescription,
+  })
+  if (raw === null) return null
 
-  try {
-    const message = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 2000,
-      system: input.system,
-      tools: [
-        {
-          name: input.toolName,
-          description: input.toolDescription,
-          input_schema: input.inputSchema as Anthropic.Tool['input_schema'],
-        },
-      ],
-      tool_choice: { type: 'tool', name: input.toolName },
-      messages: [{ role: 'user', content: input.prompt }],
-    })
-
-    const block = message.content.find((part) => part.type === 'tool_use')
-    if (!block || block.type !== 'tool_use') return null
-
-    const parsed = input.schema.safeParse(block.input)
-    if (!parsed.success) {
-      console.warn('[pact] model output failed validation, using built-in reader', parsed.error.issues[0])
-      return null
-    }
-    return parsed.data
-  } catch (cause) {
-    console.warn('[pact] model call failed, using built-in reader', cause)
+  const parsed = input.schema.safeParse(raw)
+  if (!parsed.success) {
+    console.warn('[pact] model output failed validation, using built-in reader', parsed.error.issues[0])
     return null
   }
+  return parsed.data
 }
 
 /**
