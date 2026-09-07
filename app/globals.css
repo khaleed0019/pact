@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * PACT — base layer.
+ *
+ * Written for one environment first: a WebView inside Nimiq Pay, on a phone, held in one
+ * hand. Everything here is either about surviving that environment (safe areas, dynamic
+ * viewport units, no hover dependence, no text inflation) or about the material quality
+ * of the surfaces — depth from a hairline top edge rather than a heavy shadow.
+ */
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    /* Real viewport height, so a pinned footer is not hidden behind mobile browser chrome. */
+    --app-height: 100dvh;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%; /* iOS otherwise inflates text in landscape */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-ink-900 text-chalk antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11'; /* clearer a, g, l, 1 at small sizes */
+    /* A very slow radial wash keeps the canvas from reading as flat black. */
+    background-image:
+      radial-gradient(120% 80% at 50% -20%, rgba(233, 178, 19, 0.07), transparent 60%),
+      radial-gradient(80% 60% at 100% 0%, rgba(5, 130, 202, 0.05), transparent 55%);
+    background-attachment: fixed;
+    overscroll-behavior-y: none; /* no rubber-band revealing the host app behind us */
+  }
+
+  /* Numbers must never jitter as they count up or refresh. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  button,
+  [role='button'] {
+    touch-action: manipulation; /* removes the 300ms double-tap-to-zoom delay */
+  }
+
+  /* A visible, high-contrast focus ring — keyboard and switch-control users need it,
+     and it must not be the browser default hairline on a dark surface. */
+  :focus-visible {
+    outline: 2px solid theme('colors.gold.bright');
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: rgba(233, 178, 19, 0.3);
+  }
+
+  /* Inputs at 16px+ so iOS does not zoom the viewport when they are focused. */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+@layer components {
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+  .safe-top {
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+  }
+
+  /* The card material: hairline light on the top edge, soft shadow below. */
+  .surface {
+    @apply rounded-card border border-white/[0.07] bg-ink-850 shadow-card;
+  }
+  .surface-quiet {
+    @apply rounded-card border border-white/[0.05] bg-white/[0.02];
+  }
+
+  /* Loading placeholder that shimmers rather than blinking. */
+  .skeleton {
+    @apply relative overflow-hidden rounded-lg bg-white/[0.05];
+  }
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0 -translate-x-full animate-shimmer;
+    background-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+  }
+
+  /* Horizontally scrollable regions (tables, chip rows) keep their own scrollbar
+     rather than letting the page scroll sideways. */
+  .scroll-x {
+    @apply overflow-x-auto;
+    scrollbar-width: none;
+  }
+  .scroll-x::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/*
+ * Respect the system setting. Motion in PACT is meaningful — the seal drawing itself is
+ * how you know a signature landed — so rather than deleting it we reduce it to an
+ * instant state change, which still communicates the result.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
