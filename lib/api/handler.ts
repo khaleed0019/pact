@@ -1,7 +1,7 @@
 import 'server-only'
 import { NextResponse } from 'next/server'
 import { ZodError, type ZodTypeAny, type output } from 'zod'
-import { RepoError } from '../db/index.ts'
+import { isRepoError, type RepoErrorKind } from '../db/index.ts'
 import { readSession, type Session } from '../auth/session.ts'
 import { describe, type ErrorCode } from '../errors.ts'
 
@@ -18,14 +18,14 @@ export interface ApiErrorBody {
   error: { code: ErrorCode; title: string; body: string; retry: boolean; benign?: boolean; detail?: string }
 }
 
-const STATUS_FOR: Record<RepoError['kind'], number> = {
+const STATUS_FOR: Record<RepoErrorKind, number> = {
   NOT_FOUND: 404,
   NOT_ALLOWED: 403,
   CONFLICT: 409,
   INVALID: 422,
 }
 
-const CODE_FOR: Record<RepoError['kind'], ErrorCode> = {
+const CODE_FOR: Record<RepoErrorKind, ErrorCode> = {
   NOT_FOUND: 'INVITE_INVALID',
   NOT_ALLOWED: 'NOT_ALLOWED',
   CONFLICT: 'STALE_STATE',
@@ -42,7 +42,7 @@ function toResponse(cause: unknown): NextResponse<ApiErrorBody> {
     const first = cause.issues[0]
     return fail('VALIDATION', 422, first ? `${first.path.join('.') || 'field'}: ${first.message}` : undefined)
   }
-  if (cause instanceof RepoError) {
+  if (isRepoError(cause)) {
     return fail(CODE_FOR[cause.kind], STATUS_FOR[cause.kind], cause.message)
   }
 

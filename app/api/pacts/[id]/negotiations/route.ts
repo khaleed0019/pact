@@ -3,6 +3,7 @@ import { getRepository } from '@/lib/db'
 import { authed, body, ok } from '@/lib/api/handler'
 import { negotiationSchema } from '@/lib/api/schema'
 import { loadPact, viewerOf } from '@/lib/api/pact-helpers'
+import { canTransition } from '@/lib/pact/state'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,7 +35,16 @@ export async function POST(request: Request, context: Context): Promise<NextResp
       changes: input.changes,
     })
 
-    if (pact.status === 'PENDING' || pact.status === 'DRAFT') {
+    /*
+     * Move to NEGOTIATING only if the lifecycle actually allows it.
+     *
+     * A DRAFT has not been sent to anyone, so there is nobody to negotiate with — the
+     * creator should just edit it. Previously this attempted DRAFT → NEGOTIATING
+     * unconditionally, which the state machine correctly refused, turning a legitimate
+     * request into an error. Asking the state machine instead of hardcoding a list keeps
+     * the two from drifting apart again.
+     */
+    if (canTransition(pact.status, 'NEGOTIATING', viewer.role)) {
       await repo.setStatus(id, session.address, 'NEGOTIATING')
     }
 

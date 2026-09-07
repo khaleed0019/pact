@@ -161,15 +161,37 @@ export interface Repository {
   refreshNotifications(address: string): Promise<Notification[]>
 }
 
+export type RepoErrorKind = 'NOT_FOUND' | 'NOT_ALLOWED' | 'CONFLICT' | 'INVALID'
+
 /** Thrown by repositories for conditions the API layer maps onto HTTP status codes. */
 export class RepoError extends Error {
-  constructor(
-    readonly kind: 'NOT_FOUND' | 'NOT_ALLOWED' | 'CONFLICT' | 'INVALID',
-    message: string,
-  ) {
+  /**
+   * A structural marker, checked instead of `instanceof`.
+   *
+   * This module is reachable by more than one specifier (`@/lib/db` re-exports it, and
+   * the repositories import `./repo.ts` directly). A bundler is entitled to instantiate
+   * it twice, which produces two distinct classes and makes `instanceof` quietly false —
+   * so every 403, 404 and 409 was being reported to users as a generic 500. Checking a
+   * property cannot fail that way.
+   */
+  readonly isRepoError = true as const
+  readonly kind: RepoErrorKind
+
+  constructor(kind: RepoErrorKind, message: string) {
     super(message)
     this.name = 'RepoError'
+    this.kind = kind
   }
+}
+
+/** Type guard that survives duplicate module instances. Always use this. */
+export function isRepoError(cause: unknown): cause is RepoError {
+  return (
+    typeof cause === 'object' &&
+    cause !== null &&
+    (cause as { isRepoError?: unknown }).isRepoError === true &&
+    typeof (cause as { kind?: unknown }).kind === 'string'
+  )
 }
 
 export type { Activity, Deliverable, Invitation, Milestone, Negotiation, Notification, Pact, PactDetail, Participant, Payment, TrustMetrics }

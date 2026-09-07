@@ -63,5 +63,6 @@ export function isEphemeralStore(): boolean {
   return true
 }
 
-export { RepoError } from './repo.ts'
+export { RepoError, isRepoError } from './repo.ts'
+export type { RepoErrorKind } from './repo.ts'
 export type { Repository } from './repo.ts'
