@@ -102,6 +102,158 @@
 }
 
 /*
+ * The Seal, as an orb.
+ *
+ * All of this is CSS rather than JS animation, for one practical reason: a list screen
+ * can hold a dozen seals at once, and twelve JavaScript animation loops inside a mobile
+ * WebView is a dropped-frames problem. Transform and opacity only, so every layer stays
+ * on the compositor.
+ *
+ * These classes are applied to the <div> wrapping each layer's <svg>, never to an SVG
+ * element. Measured in the target engine, a CSS transform on an <svg> or a <g> computes
+ * to the identity matrix and does nothing, and an SVG group reports a 0 0 transform
+ * origin whatever you set — so a rotation that did apply would swing the ring around the
+ * corner. Divs transform reliably and default to a centred origin. See PactSeal.
+ */
+@layer components {
+  .orb-layer {
+    will-change: transform, opacity;
+  }
+  .orb-spin {
+    animation: orb-spin linear infinite;
+  }
+  .orb-spin-reverse {
+    animation: orb-spin-reverse linear infinite;
+  }
+  .orb-breathe {
+    animation: orb-breathe ease-in-out infinite;
+  }
+  .orb-glow {
+    animation: orb-glow ease-in-out infinite;
+  }
+  /* The flourish when a seal is first earned. On the <svg> itself, where a plain
+     element transform-origin applies and nothing can fight it. */
+  .orb-enter {
+    animation: orb-enter 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+@keyframes orb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes orb-spin-reverse {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+@keyframes orb-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+@keyframes orb-glow {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.97);
+  }
+  50% {
+    opacity: 0.62;
+    transform: scale(1.04);
+  }
+}
+@keyframes orb-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.7) rotate(-26deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+ * The first-run canvas.
+ *
+ * Two very large, very slow colour fields drifting behind the hero. They are the only
+ * thing on the page that moves without being asked to, so they have to stay under the
+ * threshold of "did that just move?" — 20+ second cycles, low opacity, heavy blur. Any
+ * faster and it competes with the orb, which is the thing that should hold the eye.
+ */
+@layer components {
+  .aura {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(64px);
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+  .aura-drift {
+    animation: aura-drift ease-in-out infinite alternate;
+  }
+  .orbit {
+    animation: orb-spin linear infinite;
+    will-change: transform;
+  }
+  /* Headline accent. Background-clip on text needs the transparent fill to show through. */
+  .text-shine {
+    background-image: linear-gradient(100deg, #f7c948 0%, #e9b213 42%, #f0d68a 60%, #e9b213 78%);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shine 7s ease-in-out infinite;
+  }
+}
+
+@keyframes aura-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.5;
+  }
+  to {
+    transform: translate3d(6%, -5%, 0) scale(1.18);
+    opacity: 0.85;
+  }
+}
+
+@keyframes shine {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes rise-fade {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Staggered entrance for the hero. Index drives the delay via a custom property. */
+.rise {
+  animation: rise-fade 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--rise-index, 0) * 90ms);
+}
+
+/*
  * Respect the system setting. Motion in PACT is meaningful — the seal drawing itself is
  * how you know a signature landed — so rather than deleting it we reduce it to an
  * instant state change, which still communicates the result.
@@ -112,7 +264,13 @@
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+    /* Negative delay puts every animation past its end immediately. Without this a
+       staggered entrance with `animation-fill-mode: both` holds each element at
+       opacity 0 for the length of its delay, so reduced-motion users watch the page
+       pop in piece by piece — the exact effect the setting asks us to avoid. */
+    animation-delay: -1ms !important;
     transition-duration: 0.01ms !important;
+    transition-delay: -1ms !important;
     scroll-behavior: auto !important;
   }
 }
