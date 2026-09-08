@@ -300,7 +300,8 @@ export function heuristicExtract(description: string, creatorName: string, today
     providerName: parties.authorRole === 'PROVIDER' ? creatorName || parties.provider : parties.provider,
     authorRole: parties.authorRole,
     amount: money?.amount ?? '',
-    currency: money?.currency ?? 'USDT',
+    // NIM when nothing in the text names a currency — matches the Builder's own default.
+    currency: money?.currency ?? 'NIM',
     deadline,
     paymentCondition: condition,
     specialTerms: [],

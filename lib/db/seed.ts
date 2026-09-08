@@ -263,14 +263,18 @@ function build(spec: SeedSpec): PactDetail {
 
 /** Scenario one — the headline story: a freelance website build, mid-flight. */
 function websiteProject(): PactDetail {
-  const total = toMinor('200', 'USDT')
+  // Deliberately NIM, not USDT: this is the pact a first-time visitor lands on and the
+  // one milestone they can actually pay, so it's where the on-chain memo — PACT's
+  // deepest, most Nimiq-native mechanic — needs to be visible rather than buried behind
+  // a currency toggle nobody flips.
+  const total = toMinor('800', 'NIM')
   return build({
     id: 'demo-website',
     title: 'Marketing website design',
     deliverable: 'A five page marketing website, designed and delivered as a Figma file with source components',
     status: 'IN_PROGRESS',
-    currency: 'USDT',
-    chain: 'polygon',
+    currency: 'NIM',
+    chain: null,
     amount: total,
     deadline: dayOffset(6),
     paymentCondition: 'Half on start, half after the final design is approved',
@@ -282,7 +286,7 @@ function websiteProject(): PactDetail {
       {
         title: 'Project start',
         description: 'Kick-off, brand review and wireframes agreed',
-        amount: toMinor('100', 'USDT'),
+        amount: toMinor('400', 'NIM'),
         percent: 50,
         dueDate: dayOffset(-8),
         status: 'PAID',
@@ -290,13 +294,13 @@ function websiteProject(): PactDetail {
       {
         title: 'Final design approved',
         description: 'All five pages delivered and signed off',
-        amount: toMinor('100', 'USDT'),
+        amount: toMinor('400', 'NIM'),
         percent: 50,
         dueDate: dayOffset(6),
         status: 'IN_PROGRESS',
       },
     ],
-    payments: [{ milestoneIndex: 0, amount: toMinor('100', 'USDT'), status: 'CONFIRMED', createdAt: timeOffset(-9) }],
+    payments: [{ milestoneIndex: 0, amount: toMinor('400', 'NIM'), status: 'CONFIRMED', createdAt: timeOffset(-9) }],
     deliverables: [
       {
         milestoneIndex: 0,

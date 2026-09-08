@@ -39,8 +39,12 @@ export const EMPTY_DRAFT: Draft = {
   creatorName: '',
   counterpartyName: '',
   counterpartyAddress: '',
-  currency: 'USDT',
-  chain: 'polygon',
+  // NIM by default, not USDT. It's Nimiq's native asset and the only currency PACT can
+  // write the agreement reference into on-chain (see PaymentSheet's memo). USDT is a full
+  // second path, not an afterthought — it's just not what a Nimiq Pay Mini App should
+  // lead with.
+  currency: 'NIM',
+  chain: null,
   amount: '',
   deadline: '',
   paymentCondition: '',

@@ -36,7 +36,8 @@ export const extractionSchema = z.object({
   authorRole: z.enum(['CLIENT', 'PROVIDER']).default('CLIENT'),
   /** A decimal string as written, e.g. "200" or "12.5". Converted to minor units later. */
   amount: z.string().trim().max(30).default(''),
-  currency: z.enum(CURRENCIES).default('USDT'),
+  // NIM when the model doesn't state a currency — matches the Builder's own default.
+  currency: z.enum(CURRENCIES).default('NIM'),
   deadline: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
   paymentCondition: z.string().trim().max(300).default(''),
   specialTerms: z.array(z.string().trim().min(1).max(300)).max(12).default([]),

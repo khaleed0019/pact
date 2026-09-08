@@ -35,9 +35,9 @@ import { InvitePanel } from '@/components/pact/InvitePanel'
  */
 
 const EXAMPLES = [
-  'I want to hire John to design my website for 200 USDT. He should deliver by September 15 and I’ll pay after I approve the final design.',
-  'I need a video editor to edit 10 videos for 150 USDT by the 20th. Half upfront, half on delivery.',
+  'I want to hire John to design my website for 800 NIM. He should deliver by September 20 and I’ll pay after I approve the final design.',
   'Selling my preset pack for 850 NIM, delivered as a download link once paid.',
+  'I need a video editor to edit 10 videos for 150 USDT by the 20th. Half upfront, half on delivery.',
 ]
 
 type Step = 'describe' | 'refine' | 'done'
@@ -315,7 +315,7 @@ export default function NewPactPage() {
                 rows={6}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
-                placeholder="I want to hire John to design my website for 200 USDT…"
+                placeholder="I want to hire John to design my website for 800 NIM…"
                 maxLength={4000}
               />
             )}
@@ -452,12 +452,25 @@ export default function NewPactPage() {
                     patch({ currency, chain: currency === 'USDT' ? (draft.chain ?? 'polygon') : null })
                   }
                   options={[
+                    { value: 'NIM', label: 'NIM', hint: 'native · on-chain memo' },
                     { value: 'USDT', label: 'USDT', hint: 'stable value' },
-                    { value: 'NIM', label: 'NIM', hint: 'native, low fee' },
                   ]}
                 />
               )}
             </Field>
+
+            {draft.currency === 'NIM' && (
+              <p className="flex items-start gap-2 rounded-xl border border-gold/20 bg-gold/[0.06] px-3.5 py-3 text-[0.7rem] leading-relaxed text-chalk-muted">
+                <span aria-hidden className="mt-0.5 text-gold-bright">
+                  ●
+                </span>
+                <span>
+                  <span className="font-medium text-chalk">NIM payments carry this agreement’s reference in the
+                  transaction itself.</span> When you pay a milestone, PACT writes it into the transaction’s data
+                  field — so the payment’s purpose is on the Nimiq blockchain, not just in PACT’s own records.
+                </span>
+              </p>
+            )}
 
             <Field label="Amount" error={fieldError.amount}>
               {({ inputId }) => (
