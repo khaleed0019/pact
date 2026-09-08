@@ -9,6 +9,7 @@ import { deriveInsights, sortForDashboard } from '@/lib/pact/insights'
 import { formatAmount } from '@/lib/pact/money'
 import { greeting, relativeDeadline } from '@/lib/format'
 import { PactCard } from '@/components/pact/PactCard'
+import { TAB_BAR_SPACER } from '@/components/nav/TabBar'
 import { Button } from '@/components/ui/Button'
 import { EmptyState, SectionTitle, Skeleton } from '@/components/ui/Bits'
 import { cn } from '@/lib/cn'
@@ -110,7 +111,7 @@ export function CommandCenter() {
   )
 
   return (
-    <main className="mx-auto w-full max-w-[34rem] pb-28">
+    <main className={cn('mx-auto w-full max-w-[34rem]', TAB_BAR_SPACER)}>
       <header className="safe-top px-5 pb-5 pt-4">
         <p className="text-small text-chalk-muted">{greeting()},</p>
         <h1 className="mt-0.5 text-display text-chalk">{me?.displayName || 'there'}</h1>
@@ -243,16 +244,6 @@ export function CommandCenter() {
           </div>
         </section>
       )}
-
-      {/* Primary action pinned in the thumb zone, above the home indicator. */}
-      <div className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto max-w-[34rem] bg-gradient-to-t from-ink-900 via-ink-900/95 to-transparent px-5 pt-8">
-        <Link href="/new" className="block">
-          <Button size="lg" fullWidth>
-            <Plus aria-hidden className="h-4.5 w-4.5" style={{ width: 18, height: 18 }} />
-            Create a PACT
-          </Button>
-        </Link>
-      </div>
     </main>
   )
 }

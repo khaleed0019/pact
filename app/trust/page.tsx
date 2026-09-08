@@ -1,11 +1,11 @@
 'use client'
 
-import Link from 'next/link'
-import { ArrowLeft, ShieldCheck } from 'lucide-react'
+import { ShieldCheck } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useSession } from '@/lib/client/session'
 import { formatAmount } from '@/lib/pact/money'
 import { formatLongDate } from '@/lib/format'
+import { TabBar, TAB_BAR_SPACER } from '@/components/nav/TabBar'
 import { AddressChip, EmptyState, SectionTitle, Skeleton } from '@/components/ui/Bits'
 import { cn } from '@/lib/cn'
 import type { Currency } from '@/lib/pact/types'
@@ -38,7 +38,7 @@ export default function TrustPage() {
 
   if (loading) {
     return (
-      <main className="safe-top mx-auto w-full max-w-[34rem] space-y-4 px-5 py-6">
+      <main className={cn('safe-top mx-auto w-full max-w-[34rem] space-y-4 px-5 py-6', TAB_BAR_SPACER)}>
         <Skeleton className="h-8 w-40" />
         <div className="grid grid-cols-2 gap-2.5">
           {[0, 1, 2, 3].map((i) => (
@@ -53,16 +53,10 @@ export default function TrustPage() {
   const hasHistory = trust != null && (trust.pactsCompleted > 0 || trust.pactsActive > 0 || trust.deliveredTotal > 0)
 
   return (
-    <main className="safe-top mx-auto w-full max-w-[34rem] px-5 pb-10">
-      <header className="flex items-center gap-2 py-3">
-        <Link
-          href="/"
-          aria-label="Back"
-          className="-ml-2 flex h-tap w-tap items-center justify-center rounded-full text-chalk-muted active:bg-white/10"
-        >
-          <ArrowLeft aria-hidden className="h-5 w-5" />
-        </Link>
-        <h1 className="text-heading text-chalk">Trust profile</h1>
+    <>
+      <main className={cn('safe-top mx-auto w-full max-w-[34rem] px-5', TAB_BAR_SPACER)}>
+      <header className="py-4">
+        <h1 className="text-display text-chalk">You</h1>
       </header>
 
       <motion.section
@@ -160,7 +154,9 @@ export default function TrustPage() {
             </section>
           )}
         </>
-      )}
-    </main>
+        )}
+      </main>
+      <TabBar />
+    </>
   )
 }

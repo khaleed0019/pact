@@ -162,6 +162,20 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
   const nextUnpaid = pact?.milestones.find((m) => m.status !== 'PAID' && m.status !== 'CANCELLED')
   const cannotPay = pact ? payabilityReason(pact) : null
 
+  /**
+   * A pact with no milestones is paid in one shot — `milestoneId: null` on the payment,
+   * exactly what `PaymentSheet` and `/api/payments` already do when passed no milestone.
+   * Without this, `nextUnpaid` is permanently undefined for such a pact (there are no
+   * milestones to find), so the primary action skipped straight from "delivered" to
+   * "mark complete" with no payment step ever offered — a milestoneless PACT could reach
+   * COMPLETED having never been paid. Milestoned pacts don't have this gap: `nextUnpaid`
+   * already keeps "Pay" ahead of "Mark complete" in the priority order below.
+   */
+  const owesFullPayment =
+    pact != null &&
+    pact.milestones.length === 0 &&
+    !pact.payments.some((p) => p.milestoneId === null && p.status === 'CONFIRMED')
+
   /** The single most useful thing this person can do right now. */
   const primary = useMemo(() => {
     if (!pact || !role) return null
@@ -184,12 +198,12 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
     if ((pact.status === 'IN_PROGRESS' || pact.status === 'ACTIVE') && role === 'PROVIDER') {
       return { label: 'Submit a delivery', icon: Package, run: () => setSheet('deliver') }
     }
-    if (role === 'CLIENT' && nextUnpaid && ['ACTIVE', 'IN_PROGRESS', 'DELIVERED'].includes(pact.status)) {
+    if (role === 'CLIENT' && (nextUnpaid || owesFullPayment) && ['ACTIVE', 'IN_PROGRESS', 'DELIVERED'].includes(pact.status)) {
       return {
-        label: `Pay ${nextUnpaid.title}`,
+        label: nextUnpaid ? `Pay ${nextUnpaid.title}` : 'Pay in full',
         icon: Wallet,
         run: () => {
-          setPayTarget(nextUnpaid)
+          setPayTarget(nextUnpaid ?? null)
           setSheet('pay')
         },
         disabled: cannotPay !== null,
@@ -199,7 +213,7 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
       return { label: 'Mark complete', icon: CircleCheck, run: () => void transition('COMPLETED') }
     }
     return null
-  }, [pact, role, self, openProposal, pendingDelivery, nextUnpaid, cannotPay, me?.address])
+  }, [pact, role, self, openProposal, pendingDelivery, nextUnpaid, owesFullPayment, cannotPay, me?.address])
 
   if (loading) return <DetailSkeleton />
 

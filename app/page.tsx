@@ -4,6 +4,7 @@ import { useSession } from '@/lib/client/session'
 import { Welcome } from '@/components/screens/Welcome'
 import { CommandCenter, DashboardSkeleton } from '@/components/screens/CommandCenter'
 import { AppChrome } from '@/components/screens/AppChrome'
+import { TabBar } from '@/components/nav/TabBar'
 
 /**
  * The entry point decides between three states and nothing else.
@@ -21,6 +22,7 @@ export default function HomePage() {
   return (
     <AppChrome>
       <CommandCenter />
+      <TabBar />
     </AppChrome>
   )
 }
