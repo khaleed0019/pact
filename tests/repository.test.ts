@@ -341,6 +341,27 @@ test('a published record exposes the signatures but not the private material', a
   assert.ok(!('disputes' in record), 'dispute detail is not public')
 })
 
+test('a shareable agreement is not listed publicly', async () => {
+  // Two different consents. "Anyone with the link can check this" is not "put this in a
+  // directory", and a pact given the first must not be swept into the second.
+  const repo = new MemoryRepository()
+  const shared = await repo.createPact(draft({ title: 'Shareable one' }))
+  const listed = await repo.createPact(draft({ title: 'Public one' }))
+  const priv = await repo.createPact(draft({ title: 'Private one' }))
+
+  await repo.setVisibility(shared.id, CLIENT, 'SHAREABLE')
+  await repo.setVisibility(listed.id, CLIENT, 'PUBLIC')
+
+  const feed = await repo.listPublicRecords(30)
+  const titles = feed.map((record) => record.title)
+
+  assert.deepEqual(titles, ['Public one'], 'only the explicitly public one is listed')
+
+  // ...but the shareable one is still checkable by anyone holding its reference.
+  assert.ok(await repo.getVerificationRecord(shared.shortId))
+  assert.equal(await repo.getVerificationRecord(priv.shortId), null)
+})
+
 test('publishing can be undone', async () => {
   const repo = new MemoryRepository()
   const created = await repo.createPact(draft())

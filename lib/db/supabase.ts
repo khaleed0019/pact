@@ -881,6 +881,21 @@ export class SupabaseRepository implements Repository {
     return this.hydrate(pactId)
   }
 
+  async listPublicRecords(limit: number): Promise<VerificationRecord[]> {
+    const { data, error } = await this.db
+      .from('pacts')
+      .select('id')
+      .eq('visibility', 'PUBLIC')
+      .order('updated_at', { ascending: false })
+      .limit(limit)
+    if (error) fail(error, 'Could not load public records.')
+
+    const records = await Promise.all(
+      ((data ?? []) as Row[]).map(async (row) => toVerificationRecord(await this.hydrate(str(row.id)))),
+    )
+    return records.filter((record): record is VerificationRecord => record !== null)
+  }
+
   async getVerificationRecord(shortId: string): Promise<VerificationRecord | null> {
     const { data } = await this.db
       .from('pacts')

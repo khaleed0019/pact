@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { FileStack } from 'lucide-react'
+import { Globe, FileStack } from 'lucide-react'
 import Link from 'next/link'
 import { useSession } from '@/lib/client/session'
 import { sortForDashboard } from '@/lib/pact/insights'
@@ -62,8 +62,15 @@ export default function PactsPage() {
   return (
     <>
       <main className={cn('mx-auto w-full max-w-[34rem] px-5', TAB_BAR_SPACER)}>
-        <header className="safe-top py-4">
+        <header className="safe-top flex items-center justify-between gap-3 py-4">
           <h1 className="text-display text-chalk">Your PACTs</h1>
+          <Link
+            href="/discover"
+            className="flex min-h-tap shrink-0 items-center gap-1.5 rounded-full border border-white/[0.09] px-3.5 text-small text-chalk-muted active:bg-white/[0.07]"
+          >
+            <Globe aria-hidden className="h-3.5 w-3.5" />
+            Public
+          </Link>
         </header>
 
         <div className="scroll-x -mx-5 mb-5 flex gap-2 px-5">

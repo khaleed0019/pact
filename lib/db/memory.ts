@@ -641,6 +641,16 @@ export class MemoryRepository implements Repository {
     return this.hydrate(pactId)
   }
 
+  async listPublicRecords(limit: number): Promise<VerificationRecord[]> {
+    const out: VerificationRecord[] = []
+    for (const pact of this.t.pacts.values()) {
+      if (pact.visibility !== 'PUBLIC') continue
+      const record = toVerificationRecord(this.hydrate(pact.id))
+      if (record) out.push(record)
+    }
+    return out.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)).slice(0, limit)
+  }
+
   async getVerificationRecord(shortId: string): Promise<VerificationRecord | null> {
     const wanted = shortId.toUpperCase()
     for (const pact of this.t.pacts.values()) {

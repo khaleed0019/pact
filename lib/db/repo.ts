@@ -95,6 +95,14 @@ export interface Repository {
    * `VerificationRecord`, never a `PactDetail` — see that type for what is withheld.
    */
   getVerificationRecord(shortId: string): Promise<VerificationRecord | null>
+  /**
+   * Agreements whose parties chose to list them publicly.
+   *
+   * PUBLIC only — SHAREABLE means "anyone with the link", which is not the same as
+   * consenting to appear in a directory, and conflating the two would publish something
+   * nobody asked to publish. Returns the same redacted record as the verify route.
+   */
+  listPublicRecords(limit: number): Promise<VerificationRecord[]>
 
   // --- participants and sealing -----------------------------------------------------
   joinPact(pactId: string, address: string, displayName: string): Promise<PactDetail>
