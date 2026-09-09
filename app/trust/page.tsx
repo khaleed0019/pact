@@ -1,12 +1,15 @@
 'use client'
 
-import { ShieldCheck } from 'lucide-react'
+import { useState } from 'react'
+import { Check, Pencil, ShieldCheck, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useSession } from '@/lib/client/session'
+import { api, toUserFacing } from '@/lib/client/api'
 import { formatAmount } from '@/lib/pact/money'
 import { formatLongDate } from '@/lib/format'
 import { TabBar, TAB_BAR_SPACER } from '@/components/nav/TabBar'
 import { AddressChip, EmptyState, SectionTitle, Skeleton } from '@/components/ui/Bits'
+import { TextInput } from '@/components/ui/Field'
 import { cn } from '@/lib/cn'
 import type { Currency } from '@/lib/pact/types'
 
@@ -33,8 +36,108 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
   )
 }
 
+/**
+ * The one field on this page that isn't a count of what already happened.
+ *
+ * Everything else here is derived and read-only by design — this is the exception,
+ * because a counterparty needs to see *some* name before any pact exists to derive one
+ * from. Saves straight to `pact.profiles`, which every future pact's participant row
+ * falls back to.
+ */
+function DisplayNameEditor({ name, onSaved }: { name: string; onSaved: (name: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(name)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  if (!editing) {
+    return (
+      <div className="mt-4 flex items-center gap-1.5">
+        <h2 className="text-title text-chalk">{name || 'You'}</h2>
+        <button
+          type="button"
+          onClick={() => {
+            setDraft(name)
+            setError(null)
+            setEditing(true)
+          }}
+          aria-label="Edit your display name"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-chalk-faint transition-colors active:bg-white/10"
+        >
+          <Pencil aria-hidden className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    )
+  }
+
+  const save = async () => {
+    const trimmed = draft.trim()
+    if (!trimmed) {
+      setError('Enter a name — this is what counterparties see.')
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      await api('/api/me', { method: 'PATCH', body: { displayName: trimmed } })
+      onSaved(trimmed)
+      setEditing(false)
+    } catch (cause) {
+      setError(toUserFacing(cause).body)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="mt-4 w-full max-w-[16rem] text-left">
+      <div className="flex items-center gap-2">
+        <TextInput
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void save()
+            if (e.key === 'Escape') setEditing(false)
+          }}
+          maxLength={80}
+          placeholder="e.g. Alex"
+          error={Boolean(error)}
+          className="py-2 text-center text-title"
+          disabled={saving}
+        />
+      </div>
+      <div className="mt-2 flex items-center justify-center gap-2">
+        <button
+          type="button"
+          onClick={() => setEditing(false)}
+          disabled={saving}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-chalk-faint transition-colors active:bg-white/10"
+          aria-label="Cancel"
+        >
+          <X aria-hidden className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => void save()}
+          disabled={saving}
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-gold/15 text-gold-bright transition-colors active:bg-gold/25 disabled:opacity-50"
+          aria-label="Save"
+        >
+          <Check aria-hidden className="h-4 w-4" />
+        </button>
+      </div>
+      {error && (
+        <p role="alert" className="mt-1.5 text-center text-[0.7rem] leading-relaxed text-rose">
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
 export default function TrustPage() {
-  const { me, loading } = useSession()
+  const { me, loading, refresh } = useSession()
 
   if (loading) {
     return (
@@ -68,7 +171,7 @@ export default function TrustPage() {
         <div className="flex h-16 w-16 items-center justify-center rounded-full border border-gold/30 bg-gold/10">
           <ShieldCheck aria-hidden className="h-7 w-7 text-gold-bright" />
         </div>
-        <h2 className="mt-4 text-title text-chalk">{me?.displayName || 'You'}</h2>
+        <DisplayNameEditor name={trust?.displayName ?? ''} onSaved={() => void refresh()} />
         {me?.address && <AddressChip address={me.address} full className="mt-2" />}
         {trust?.firstSeenAt && (
           <p className="mt-2 text-[0.7rem] text-chalk-faint">On PACT since {formatLongDate(trust.firstSeenAt)}</p>

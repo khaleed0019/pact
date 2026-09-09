@@ -50,6 +50,9 @@ interface Tables {
   activities: Map<string, Activity[]>
   invitations: Map<string, Invitation>
   notifications: Map<string, Notification[]>
+  // Keyed by normalized address. Mirrors Supabase's `profiles` table: an explicit name
+  // set once here always wins over whatever a single pact's participant row says.
+  profiles: Map<string, string>
 }
 
 function emptyTables(): Tables {
@@ -58,6 +61,7 @@ function emptyTables(): Tables {
     participants: new Map(),
     milestones: new Map(),
     payments: new Map(),
+    profiles: new Map(),
     deliverables: new Map(),
     negotiations: new Map(),
     activities: new Map(),
@@ -677,11 +681,16 @@ export class MemoryRepository implements Repository {
    * Both the numerator and the denominator are returned so the UI can say "4 of 5"
    * rather than an unfalsifiable percentage.
    */
+  /** See Repository.updateProfile. */
+  async updateProfile(address: string, displayName: string): Promise<void> {
+    this.t.profiles.set(normalizeAddress(address), displayName)
+  }
+
   async getTrustMetrics(address: string): Promise<TrustMetrics> {
     const wanted = normalizeAddress(address)
     const metrics: TrustMetrics = {
       address: wanted,
-      displayName: '',
+      displayName: this.t.profiles.get(wanted) ?? '',
       pactsCompleted: 0,
       pactsActive: 0,
       pactsCancelled: 0,

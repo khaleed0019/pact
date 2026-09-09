@@ -153,6 +153,9 @@ export interface Repository {
   getInvitationByToken(token: string): Promise<Invitation | null>
   acceptInvitation(token: string, address: string): Promise<Invitation>
 
+  /** Set the display name shown to counterparties on every future pact, and on the trust profile. */
+  updateProfile(address: string, displayName: string): Promise<void>
+
   getTrustMetrics(address: string): Promise<TrustMetrics>
   listNotifications(address: string): Promise<Notification[]>
   markNotificationRead(id: string, address: string): Promise<void>

@@ -910,6 +910,18 @@ export class SupabaseRepository implements Repository {
     return toInvitation(data as Row)
   }
 
+  /** See Repository.updateProfile. */
+  async updateProfile(address: string, displayName: string): Promise<void> {
+    const normalized = await this.ensureUser(address)
+    // Not routed through ensureUser's own displayName param: that upsert is skipped for
+    // a falsy name (existing callers only ever pass a name they already have), but an
+    // explicit profile edit must be able to write exactly what was typed.
+    const { error } = await this.db
+      .from('profiles')
+      .upsert({ address: normalized, display_name: displayName }, { onConflict: 'address' })
+    if (error) fail(error, 'Could not update your profile.')
+  }
+
   /**
    * Trust, computed from rows rather than stored.
    *

@@ -227,6 +227,25 @@ test('trust counts only confirmed payments and completed agreements', async () =
   assert.equal(trust.pactsCompleted, 0, 'the agreement itself is not finished yet')
 })
 
+test('an explicit profile name wins over whatever a pact\'s participant row says', async () => {
+  const repo = new MemoryRepository()
+
+  // No pact yet at all — the trust profile still resolves the name once it's been set
+  // explicitly, rather than requiring at least one pact to derive one from.
+  let trust = await repo.getTrustMetrics(CLIENT)
+  assert.equal(trust.displayName, '', 'nothing set yet')
+
+  await repo.updateProfile(CLIENT, 'Khaleed A.')
+  trust = await repo.getTrustMetrics(CLIENT)
+  assert.equal(trust.displayName, 'Khaleed A.')
+
+  // A pact created afterwards used whatever name the builder was filled in with at the
+  // time ("Khaleed") — the explicit profile edit still wins on the trust page.
+  await repo.createPact(draft({ creatorName: 'Khaleed' }))
+  trust = await repo.getTrustMetrics(CLIENT)
+  assert.equal(trust.displayName, 'Khaleed A.', 'the explicit edit is not overwritten by pact activity')
+})
+
 test('reminders never repeat for the same reason', async () => {
   const repo = new MemoryRepository()
   const created = await repo.createPact(draft({ deadline: '2020-01-01' }))

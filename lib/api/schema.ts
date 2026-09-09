@@ -96,6 +96,10 @@ export const joinSchema = z.object({
   token: z.string().max(64).optional(),
 })
 
+export const updateProfileSchema = z.object({
+  displayName: text(80),
+})
+
 export const negotiationSchema = z.object({
   message: text(1000),
   changes: z
