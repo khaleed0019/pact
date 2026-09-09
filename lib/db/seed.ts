@@ -234,7 +234,10 @@ function build(spec: SeedSpec): PactDetail {
     actorAddress: addressOf(a.actor === 'client' ? 'CLIENT' : 'PROVIDER'),
     actorName: nameOf(a.actor === 'client' ? 'CLIENT' : 'PROVIDER'),
     summary: a.summary,
-    meta: a.meta ?? {},
+    // Sealing records the fingerprint it sealed, exactly as app/api/pacts/[id]/seal does.
+    // Without it a demo pact carries a history a real one would never have, and anything
+    // reading that history — change detection, for one — silently sees nothing.
+    meta: a.kind === 'PACT_SEALED' ? { fingerprint: digest, ...(a.meta ?? {}) } : (a.meta ?? {}),
     createdAt: a.at,
   }))
 

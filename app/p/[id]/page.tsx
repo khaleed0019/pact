@@ -27,6 +27,7 @@ import { normalizeAddress } from '@/lib/nimiq/address'
 import { formatLongDate, relativeDeadline, relativeTime } from '@/lib/format'
 import { DISPUTE_REASON_META, STATUS_META } from '@/lib/pact/state'
 import { categoryMeta, roleLabel, usesPayment } from '@/lib/pact/categories'
+import { detectTermsChange } from '@/lib/pact/change'
 import { EVM_CHAINS } from '@/lib/pact/types'
 import type { Milestone, PactDetail, PactVisibility, ParticipantRole } from '@/lib/pact/types'
 import type { UserFacingError } from '@/lib/errors'
@@ -200,6 +201,8 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
   const other = useMemo(() => pact?.participants.find((p) => p !== self), [pact, self])
   const openProposal = pact?.negotiations.find((n) => n.status === 'OPEN')
   const openDispute = pact?.disputes.find((d) => d.status === 'OPEN')
+  // Derived from recorded history, not stored: see lib/pact/change.ts.
+  const termsChange = pact ? detectTermsChange(pact) : null
   // Built client-side so it's whatever host the viewer is actually on — Vercel preview,
   // production domain, or localhost — rather than a baked-in guess.
   const verifyUrl = pact
@@ -331,6 +334,35 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
 
         {cannotPay && role === 'CLIENT' && <ErrorNotice error={cannotPay} className="mb-5" />}
         {error && <ErrorNotice error={error} className="mb-5" onRetry={() => void load()} />}
+
+        {/* --- terms changed after signing ----------------------------------------- */}
+        {termsChange && (
+          <section className="mb-7">
+            <div className="surface border-rose/40 bg-rose/[0.07] px-4 py-4">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-rose" />
+                <div className="min-w-0">
+                  <h2 className="text-small font-semibold text-chalk">Terms changed after signing</h2>
+                  <p className="mt-1 text-[0.7rem] leading-relaxed text-chalk-muted">
+                    Both of you signed one version of this agreement, and the terms have moved since. The signatures
+                    were cleared automatically, because a signature only ever matches the exact terms it was made
+                    over — it cannot carry across to different ones.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-3.5 space-y-2">
+                <DigestRow label="Signed" digest={termsChange.signedDigest} at={termsChange.signedAt} struck />
+                <DigestRow label="Now" digest={termsChange.currentDigest} at={termsChange.changedAt} />
+              </div>
+
+              <p className="mt-3 text-[0.7rem] leading-relaxed text-chalk-faint">
+                Nothing is lost and nothing is broken — this is the mechanism working. Sign again to lock in the terms
+                as they read now.
+              </p>
+            </div>
+          </section>
+        )}
 
         {/* --- open issue ---------------------------------------------------------- */}
         {openDispute && (
@@ -794,6 +826,42 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
         onRaised={() => void load()}
       />
     </>
+  )
+}
+
+/**
+ * One fingerprint, with the date it applied. The struck-through one is what was signed.
+ *
+ * Both are shown in full rather than truncated: the entire point is that a reader can see
+ * for themselves that these are two different values, and "7d91…a82c" against
+ * "a82f…19bc" asks them to take that on trust instead.
+ */
+function DigestRow({
+  label,
+  digest,
+  at,
+  struck,
+}: {
+  label: string
+  digest: string
+  at: string | null
+  struck?: boolean
+}) {
+  return (
+    <div className="rounded-xl border border-white/[0.07] bg-black/30 px-3.5 py-2.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[0.65rem] uppercase tracking-wider text-chalk-faint">{label}</span>
+        {at && <span className="text-[0.65rem] text-chalk-faint">{formatLongDate(at)}</span>}
+      </div>
+      <p
+        className={cn(
+          'tabular mt-1 break-all text-[0.7rem] leading-relaxed',
+          struck ? 'text-chalk-faint line-through decoration-rose/60' : 'text-chalk',
+        )}
+      >
+        {digest.replace(/(.{4})/g, '$1 ').trim().toUpperCase()}
+      </p>
+    </div>
   )
 }
 

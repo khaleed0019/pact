@@ -34,19 +34,36 @@ const GRAPH: Record<PactStatus, Transition[]> = {
     { to: 'DECLINED', by: ['CLIENT', 'PROVIDER'] },
     { to: 'CANCELLED', by: ['CLIENT', 'PROVIDER'] },
   ],
+  /**
+   * The three live states can all go back to NEGOTIATING, and that edge is load-bearing.
+   *
+   * Without it, proposing changes on a sealed agreement was a dead end: the UI offered
+   * "Propose changes", opening one could not move the status, and the counterparty's
+   * "Accept changes" then failed with "a sealed agreement can only be changed by
+   * proposing changes" — the thing they were doing. Renegotiating a live agreement is
+   * completely ordinary, so it has to be reachable.
+   *
+   * Going back through NEGOTIATING is also what makes re-signing correct rather than
+   * optional: applying the accepted changes moves the digest, which clears both
+   * signatures, so the pact cannot return to ACTIVE until both people have signed the
+   * terms as they now read.
+   */
   ACTIVE: [
     { to: 'IN_PROGRESS', by: ['PROVIDER'] },
+    { to: 'NEGOTIATING', by: ['CLIENT', 'PROVIDER'] },
     { to: 'DISPUTED', by: ['CLIENT', 'PROVIDER'] },
     { to: 'CANCELLED', by: ['CLIENT', 'PROVIDER'] },
   ],
   IN_PROGRESS: [
     { to: 'DELIVERED', by: ['PROVIDER'] },
+    { to: 'NEGOTIATING', by: ['CLIENT', 'PROVIDER'] },
     { to: 'DISPUTED', by: ['CLIENT', 'PROVIDER'] },
     { to: 'CANCELLED', by: ['CLIENT', 'PROVIDER'] },
   ],
   DELIVERED: [
     { to: 'COMPLETED', by: ['CLIENT'] },
     { to: 'IN_PROGRESS', by: ['CLIENT'] }, // changes requested, back to work
+    { to: 'NEGOTIATING', by: ['CLIENT', 'PROVIDER'] },
     { to: 'DISPUTED', by: ['CLIENT', 'PROVIDER'] },
   ],
   // Terminal, except that a dispute can be worked out.

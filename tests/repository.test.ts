@@ -4,6 +4,8 @@ import { MemoryRepository } from '../lib/db/memory.ts'
 import { isRepoError } from '../lib/db/repo.ts'
 import { toVerificationRecord } from '../lib/pact/verification.ts'
 import { CATEGORY_META, PACT_CATEGORIES, roleLabel, usesPayment } from '../lib/pact/categories.ts'
+import { detectTermsChange } from '../lib/pact/change.ts'
+import { canTransition } from '../lib/pact/state.ts'
 import type { CreatePactInput } from '../lib/db/repo.ts'
 
 /**
@@ -504,4 +506,100 @@ test('joining fills the open side and re-derives the fingerprint', async () => {
     () => repo.joinPact(created.id, STRANGER, 'Interloper'),
     (cause) => isRepoError(cause) && cause.kind === 'CONFLICT',
   )
+})
+
+test('a pact whose terms moved after sealing says so', async () => {
+  const repo = new MemoryRepository()
+  const created = await repo.createPact(draft())
+  await repo.setStatus(created.id, CLIENT, 'PENDING')
+
+  // Both sign, and record the sealing exactly as the real seal route does.
+  await seal(repo, created.id)
+  const sealedPact = (await repo.getPactById(created.id))!
+  const signedDigest = sealedPact.termsDigest
+  await repo.addActivity({
+    pactId: created.id,
+    kind: 'PACT_SEALED',
+    actorAddress: null,
+    actorName: 'PACT',
+    summary: 'Both sides signed. The terms are locked.',
+    meta: { fingerprint: signedDigest },
+  })
+
+  // Nothing has moved, so there is nothing to warn about.
+  assert.equal(detectTermsChange((await repo.getPactById(created.id))!), null)
+
+  // Now move a term. reseal() clears both signatures and the digest changes.
+  await repo.setStatus(created.id, CLIENT, 'NEGOTIATING')
+  const edited = await repo.updateTerms(created.id, CLIENT, { deadline: '2026-12-01' })
+  await repo.addActivity({
+    pactId: created.id,
+    kind: 'PACT_CREATED',
+    actorAddress: CLIENT,
+    actorName: 'Khaleed',
+    summary: 'Khaleed edited the terms',
+    meta: { fingerprint: edited.termsDigest },
+  })
+
+  const change = detectTermsChange((await repo.getPactById(created.id))!)
+  assert.ok(change, 'the agreement both people signed is no longer what this says')
+  assert.equal(change.signedDigest, signedDigest)
+  assert.equal(change.currentDigest, edited.termsDigest)
+  assert.notEqual(change.signedDigest, change.currentDigest)
+  assert.ok(change.changedAt, 'the timeline recorded when it moved')
+})
+
+test('terms moving before both sides signed is not flagged', async () => {
+  // Renegotiating before a pact is sealed is the ordinary path, not a broken agreement.
+  const repo = new MemoryRepository()
+  const created = await repo.createPact(draft())
+  await repo.setStatus(created.id, CLIENT, 'PENDING')
+  await repo.recordSeal({ pactId: created.id, address: CLIENT, signature: 'a'.repeat(128), publicKey: 'b'.repeat(64) })
+
+  await repo.setStatus(created.id, CLIENT, 'NEGOTIATING')
+  await repo.updateTerms(created.id, CLIENT, { deadline: '2026-12-02' })
+
+  assert.equal(detectTermsChange((await repo.getPactById(created.id))!), null)
+})
+
+test('a sealed agreement can be renegotiated, and both sides must sign again', async () => {
+  // This is the loop that used to dead-end: "Propose changes" was offered on a sealed
+  // pact, but accepting threw CONFLICT telling the user to propose changes.
+  const repo = new MemoryRepository()
+  const created = await repo.createPact(draft())
+  await repo.setStatus(created.id, CLIENT, 'PENDING')
+  await seal(repo, created.id)
+
+  const sealed = (await repo.getPactById(created.id))!
+  await repo.setStatus(created.id, CLIENT, 'ACTIVE')
+  const signedDigest = sealed.termsDigest
+
+  // Either side can reopen a live agreement.
+  assert.ok(canTransition('ACTIVE', 'NEGOTIATING', 'PROVIDER'))
+  assert.ok(canTransition('IN_PROGRESS', 'NEGOTIATING', 'CLIENT'))
+  assert.ok(canTransition('DELIVERED', 'NEGOTIATING', 'PROVIDER'))
+
+  const negotiation = await repo.openNegotiation({
+    pactId: created.id,
+    proposedBy: PROVIDER,
+    message: 'I need four more days for the mobile layouts.',
+    changes: [{ field: 'deadline', label: 'Deadline', originalValue: '2026-09-20', proposedValue: '2026-09-24' }],
+  })
+  await repo.setStatus(created.id, PROVIDER, 'NEGOTIATING')
+  await repo.resolveNegotiation({ negotiationId: negotiation.id, actor: CLIENT, status: 'ACCEPTED' })
+
+  // Applying the accepted change is now possible, and it moves the digest.
+  const updated = await repo.updateTerms(created.id, CLIENT, { deadline: '2026-09-24' })
+  assert.notEqual(updated.termsDigest, signedDigest, 'the agreed terms moved, so the fingerprint moved')
+  assert.deepEqual(
+    updated.participants.map((p) => p.sealSignature),
+    [null, null],
+    'nobody stays bound to terms they did not see',
+  )
+
+  // And the pact cannot be treated as sealed until both have signed the new terms.
+  await seal(repo, created.id)
+  const resealed = (await repo.getPactById(created.id))!
+  assert.ok(resealed.participants.every((p) => p.sealSignature !== null))
+  assert.equal(resealed.termsDigest, updated.termsDigest)
 })
