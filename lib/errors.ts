@@ -22,6 +22,7 @@ export type ErrorCode =
   | 'INVITE_INVALID'
   | 'STALE_STATE'
   | 'NOT_ALLOWED'
+  | 'NOT_SIGNED_IN'
   | 'VALIDATION'
   | 'AI_UNAVAILABLE'
   | 'SERVER'
@@ -113,6 +114,19 @@ const CATALOG: Record<ErrorCode, Omit<UserFacingError, 'code'>> = {
   NOT_ALLOWED: {
     title: 'Not available for you',
     body: 'Only the other party can take this step right now.',
+    retry: false,
+  },
+  /**
+   * Distinct from NOT_ALLOWED on purpose.
+   *
+   * Both are 401/403 shaped, but they are different problems with different fixes:
+   * NOT_ALLOWED means "this isn't your step", which telling a signed-out person is
+   * actively misleading — they don't need to wait for the other party, they need to
+   * sign in.
+   */
+  NOT_SIGNED_IN: {
+    title: 'Sign in to continue',
+    body: 'Connect your Nimiq wallet, or explore the demo, and then try again.',
     retry: false,
   },
   VALIDATION: { title: 'Check the details', body: 'Something in the form needs fixing.', retry: false },

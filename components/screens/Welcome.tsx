@@ -23,6 +23,13 @@ import { cn } from '@/lib/cn'
  * consolation prize.
  */
 
+/**
+ * Make it, agree to it, prove it — the three things PACT does, in the order they happen.
+ *
+ * Deliberately one screen rather than three swipes. Both routes in have to be reachable
+ * on first paint (see below), and putting two taps in front of "Explore demo" is exactly
+ * the dead end this screen exists to avoid.
+ */
 const MECHANICS = [
   {
     icon: PenLine,
@@ -36,8 +43,8 @@ const MECHANICS = [
   },
   {
     icon: Receipt,
-    title: 'Payments land on the record',
-    body: 'Pay from the agreement itself. Every payment is tied to the milestone it settles.',
+    title: 'Prove what happened',
+    body: 'Track the work, pay from the agreement if money is involved, and end up with a record either of you can share and anyone can check.',
   },
 ]
 

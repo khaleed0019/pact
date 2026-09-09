@@ -68,7 +68,7 @@ export function route(handler: () => Promise<NextResponse> | NextResponse) {
 export async function authed(handler: Handler<{ session: Session }>): Promise<NextResponse> {
   try {
     const session = await readSession()
-    if (!session) return fail('NOT_ALLOWED', 401, 'Sign in with your Nimiq wallet to continue.')
+    if (!session) return fail('NOT_SIGNED_IN', 401, 'Sign in with your Nimiq wallet to continue.')
     return await handler({ session })
   } catch (cause) {
     return toResponse(cause)
