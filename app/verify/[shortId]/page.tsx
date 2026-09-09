@@ -3,7 +3,7 @@
 import { use, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { ArrowRight, Check, Copy, ShieldCheck } from 'lucide-react'
+import { ArrowRight, Check, Copy, Share2, ShieldCheck } from 'lucide-react'
 import { api, toUserFacing } from '@/lib/client/api'
 import { formatWithCurrency } from '@/lib/pact/money'
 import { formatLongDate } from '@/lib/format'
@@ -33,6 +33,7 @@ export default function VerifyPage({ params }: { params: Promise<{ shortId: stri
   const { shortId } = use(params)
   const [record, setRecord] = useState<VerificationRecord | null>(null)
   const [loading, setLoading] = useState(true)
+  const [shared, setShared] = useState(false)
   const [error, setError] = useState<UserFacingError | null>(null)
 
   const load = useCallback(async () => {
@@ -77,6 +78,27 @@ export default function VerifyPage({ params }: { params: Promise<{ shortId: stri
         </div>
       </main>
     )
+  }
+
+  /**
+   * Hands off to the OS share sheet where there is one, and falls back to the clipboard.
+   * Inside a WebView the native sheet is usually the only thing that works, and outside
+   * it the clipboard usually is — so try both rather than picking one.
+   */
+  const share = async () => {
+    const url = window.location.href
+    const nav = navigator as Navigator & { share?: (data: { title: string; url: string }) => Promise<void> }
+    try {
+      if (nav.share) {
+        await nav.share({ title: `PACT · ${record.title}`, url })
+        return
+      }
+      await navigator.clipboard.writeText(url)
+      setShared(true)
+      setTimeout(() => setShared(false), 1600)
+    } catch {
+      // Cancelling the share sheet lands here too, so this stays silent on purpose.
+    }
   }
 
   const meta = STATUS_META[record.status]
@@ -234,7 +256,11 @@ export default function VerifyPage({ params }: { params: Promise<{ shortId: stri
         </div>
       </section>
 
-      <div className="text-center">
+      <div className="space-y-4 text-center">
+        <Button variant="secondary" size="lg" fullWidth onClick={() => void share()}>
+          {shared ? <Check aria-hidden className="h-4 w-4 text-jade" /> : <Share2 aria-hidden className="h-4 w-4" />}
+          {shared ? 'Link copied' : 'Share this record'}
+        </Button>
         <Link href="/" className="inline-flex items-center gap-1.5 text-small text-chalk-muted underline underline-offset-4">
           Make an agreement like this
           <ArrowRight aria-hidden className="h-3.5 w-3.5" />

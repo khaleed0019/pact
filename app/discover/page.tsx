@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { ArrowLeft, ChevronRight, Globe } from 'lucide-react'
 import { api, toUserFacing } from '@/lib/client/api'
@@ -10,6 +11,8 @@ import { relativeTime } from '@/lib/format'
 import { categoryMeta, usesPayment } from '@/lib/pact/categories'
 import { PactSeal } from '@/components/seal/PactSeal'
 import { EmptyState, ErrorNotice, Skeleton, StatusPill } from '@/components/ui/Bits'
+import { Button } from '@/components/ui/Button'
+import { TextInput } from '@/components/ui/Field'
 import type { VerificationRecord } from '@/lib/pact/types'
 import type { UserFacingError } from '@/lib/errors'
 
@@ -26,6 +29,8 @@ import type { UserFacingError } from '@/lib/errors'
  * being a gallery rather than a marketplace.
  */
 export default function DiscoverPage() {
+  const router = useRouter()
+  const [lookup, setLookup] = useState('')
   const [records, setRecords] = useState<VerificationRecord[] | null>(null)
   const [error, setError] = useState<UserFacingError | null>(null)
 
@@ -56,10 +61,35 @@ export default function DiscoverPage() {
         <h1 className="text-heading text-chalk">Public records</h1>
       </header>
 
-      <p className="mb-5 text-small leading-relaxed text-chalk-muted">
+      <p className="mb-4 text-small leading-relaxed text-chalk-muted">
         Agreements whose parties chose to publish them. You can check any of these — the terms, the fingerprint, and
         both signatures — without being part of it.
       </p>
+
+      {/* Every pact prints its reference on screen and in the on-chain memo, so being
+          handed one and having nowhere to type it was a real dead end. */}
+      <form
+        onSubmit={(event) => {
+          event.preventDefault()
+          const reference = lookup.trim().toUpperCase()
+          if (reference.length > 0) router.push(`/verify/${reference}`)
+        }}
+        className="mb-6 flex gap-2"
+      >
+        <TextInput
+          value={lookup}
+          onChange={(event) => setLookup(event.target.value)}
+          placeholder="Check a reference, e.g. 2UTQT9FA"
+          aria-label="Pact reference"
+          autoCapitalize="characters"
+          spellCheck={false}
+          maxLength={12}
+          className="tabular"
+        />
+        <Button type="submit" variant="secondary" disabled={lookup.trim().length === 0}>
+          Check
+        </Button>
+      </form>
 
       {error && <ErrorNotice error={error} className="mb-5" onRetry={() => void load()} />}
 
