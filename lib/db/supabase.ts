@@ -22,6 +22,7 @@ import type {
   PactStatus,
   PactVisibility,
   Participant,
+  ProductStats,
   ParticipantRole,
   Payment,
   PaymentStatus,
@@ -1059,6 +1060,67 @@ export class SupabaseRepository implements Repository {
    * without a transaction reference, or a delivery without a due date to compare
    * against, contributes nothing.
    */
+  async getProductStats(): Promise<ProductStats> {
+    // `head: true` means these return a count and no rows at all.
+    const HEAD = { count: 'exact' as const, head: true }
+    const [pacts, completed, published, invites, accepted, disputes, resolved] = await Promise.all([
+      this.db.from('pacts').select('*', HEAD),
+      this.db.from('pacts').select('*', HEAD).eq('status', 'COMPLETED'),
+      this.db.from('pacts').select('*', HEAD).neq('visibility', 'PRIVATE'),
+      this.db.from('invitations').select('*', HEAD),
+      this.db.from('invitations').select('*', HEAD).not('accepted_at', 'is', null),
+      this.db.from('disputes').select('*', HEAD),
+      this.db.from('disputes').select('*', HEAD).eq('status', 'RESOLVED'),
+    ])
+
+    // These three need the rows themselves: distinct addresses, sealed-on-both-sides, and
+    // per-currency totals are not things a count(*) can answer.
+    const [participantRows, paymentRows] = await Promise.all([
+      this.db.from('pact_participants').select('pact_id, address, seal_signature'),
+      this.db.from('payments').select('amount_minor::text, currency, status, tx_reference').eq('status', 'CONFIRMED'),
+    ])
+
+    const addresses = new Set<string>()
+    const sealedByPact = new Map<string, { total: number; signed: number }>()
+    for (const row of ((participantRows.data ?? []) as Row[])) {
+      const address = nullable(row.address)
+      if (address) addresses.add(normalizeAddress(address))
+      const pactId = str(row.pact_id)
+      const tally = sealedByPact.get(pactId) ?? { total: 0, signed: 0 }
+      tally.total += 1
+      if (nullable(row.seal_signature)) tally.signed += 1
+      sealedByPact.set(pactId, tally)
+    }
+
+    const valueByCurrency: Record<string, string> = {}
+    let paymentsConfirmed = 0
+    for (const row of ((paymentRows.data ?? []) as Row[])) {
+      if (!nullable(row.tx_reference)) continue
+      paymentsConfirmed += 1
+      const currency = str(row.currency)
+      valueByCurrency[currency] = sumMinor([valueByCurrency[currency] ?? '0', str(row.amount_minor)])
+    }
+
+    let pactsSealed = 0
+    for (const tally of sealedByPact.values()) {
+      if (tally.total > 0 && tally.total === tally.signed) pactsSealed += 1
+    }
+
+    return {
+      pactsCreated: pacts.count ?? 0,
+      pactsSealed,
+      pactsCompleted: completed.count ?? 0,
+      participants: addresses.size,
+      invitationsAccepted: accepted.count ?? 0,
+      invitationsSent: invites.count ?? 0,
+      paymentsConfirmed,
+      valueByCurrency,
+      publicRecords: published.count ?? 0,
+      disputesRaised: disputes.count ?? 0,
+      disputesResolved: resolved.count ?? 0,
+    }
+  }
+
   async getTrustMetrics(address: string): Promise<TrustMetrics> {
     const wanted = normalizeAddress(address)
 

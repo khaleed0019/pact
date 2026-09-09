@@ -16,6 +16,7 @@ import type {
   PactDetail,
   PactStatus,
   PactVisibility,
+  ProductStats,
   Participant,
   ParticipantRole,
   Payment,
@@ -202,6 +203,14 @@ export interface Repository {
 
   /** Set the display name shown to counterparties on every future pact, and on the trust profile. */
   updateProfile(address: string, displayName: string): Promise<void>
+
+  /**
+   * Aggregate counts across the whole product.
+   *
+   * No arguments, and deliberately no per-user breakdown available through it: this
+   * answers "is anyone using PACT" without answering "what did that person do".
+   */
+  getProductStats(): Promise<ProductStats>
 
   getTrustMetrics(address: string): Promise<TrustMetrics>
   listNotifications(address: string): Promise<Notification[]>

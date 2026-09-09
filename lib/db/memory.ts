@@ -21,6 +21,7 @@ import type {
   PactStatus,
   PactVisibility,
   Participant,
+  ProductStats,
   ParticipantRole,
   Payment,
   PaymentStatus,
@@ -777,6 +778,57 @@ export class MemoryRepository implements Repository {
   /** See Repository.updateProfile. */
   async updateProfile(address: string, displayName: string): Promise<void> {
     this.t.profiles.set(normalizeAddress(address), displayName)
+  }
+
+  async getProductStats(): Promise<ProductStats> {
+    const stats: ProductStats = {
+      pactsCreated: this.t.pacts.size,
+      pactsSealed: 0,
+      pactsCompleted: 0,
+      participants: 0,
+      invitationsAccepted: 0,
+      invitationsSent: this.t.invitations.size,
+      paymentsConfirmed: 0,
+      valueByCurrency: {},
+      publicRecords: 0,
+      disputesRaised: 0,
+      disputesResolved: 0,
+    }
+
+    const addresses = new Set<string>()
+
+    for (const pact of this.t.pacts.values()) {
+      if (pact.status === 'COMPLETED') stats.pactsCompleted += 1
+      if (pact.visibility === 'PUBLIC' || pact.visibility === 'SHAREABLE') stats.publicRecords += 1
+
+      const participants = this.t.participants.get(pact.id) ?? []
+      if (participants.length > 0 && participants.every((p) => p.sealSignature !== null)) stats.pactsSealed += 1
+      for (const participant of participants) {
+        if (participant.address) addresses.add(normalizeAddress(participant.address))
+      }
+
+      for (const payment of this.t.payments.get(pact.id) ?? []) {
+        // Same rule as the trust profile: no transaction reference, no count.
+        if (payment.status !== 'CONFIRMED' || !payment.txReference) continue
+        stats.paymentsConfirmed += 1
+        stats.valueByCurrency[payment.currency] = sumMinor([
+          stats.valueByCurrency[payment.currency] ?? '0',
+          payment.amountMinor,
+        ])
+      }
+
+      for (const dispute of this.t.disputes.get(pact.id) ?? []) {
+        stats.disputesRaised += 1
+        if (dispute.status === 'RESOLVED') stats.disputesResolved += 1
+      }
+    }
+
+    for (const invitation of this.t.invitations.values()) {
+      if (invitation.acceptedAt) stats.invitationsAccepted += 1
+    }
+
+    stats.participants = addresses.size
+    return stats
   }
 
   async getTrustMetrics(address: string): Promise<TrustMetrics> {

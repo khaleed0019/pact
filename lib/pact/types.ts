@@ -328,6 +328,34 @@ export interface VerificationRecord {
   updatedAt: string
 }
 
+/**
+ * Product-wide counts.
+ *
+ * Deliberately derived from rows that already exist rather than from any tracking: PACT
+ * records no events, sets no analytics cookie, and stores nothing about a person that
+ * isn't already part of an agreement they made. Everything below is a `count(*)` over
+ * data the product needed anyway.
+ *
+ * Note what is absent: no per-user activity, no sessions, no retention cohorts, no
+ * timestamps of who opened what. Those would all require collecting something new about
+ * people, and none of them are worth that.
+ */
+export interface ProductStats {
+  pactsCreated: number
+  pactsSealed: number
+  pactsCompleted: number
+  /** Distinct addresses that are a party to at least one agreement. */
+  participants: number
+  invitationsAccepted: number
+  invitationsSent: number
+  paymentsConfirmed: number
+  /** Settled value per currency. Never summed across currencies — that number means nothing. */
+  valueByCurrency: Record<string, string>
+  publicRecords: number
+  disputesRaised: number
+  disputesResolved: number
+}
+
 export interface TrustMetrics {
   address: string
   displayName: string

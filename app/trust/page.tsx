@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, Pencil, ShieldCheck, X } from 'lucide-react'
+import { BarChart3, Check, Pencil, ShieldCheck, X } from 'lucide-react'
+import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { useSession } from '@/lib/client/session'
 import { api, toUserFacing } from '@/lib/client/api'
@@ -258,6 +259,15 @@ export default function TrustPage() {
           )}
         </>
         )}
+        <section className="mt-8 text-center">
+          <Link
+            href="/stats"
+            className="inline-flex min-h-tap items-center gap-1.5 text-small text-chalk-muted underline underline-offset-4"
+          >
+            <BarChart3 aria-hidden className="h-3.5 w-3.5" />
+            How much PACT is being used
+          </Link>
+        </section>
       </main>
       <TabBar />
     </>
