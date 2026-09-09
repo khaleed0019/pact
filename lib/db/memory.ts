@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { canTransition, isTerminal, type Actor } from '../pact/state.ts'
 import { shortIdFromDigest, termsDigest, type CanonicalTerms } from '../pact/digest.ts'
 import { sumMinor } from '../pact/money.ts'
+import { toVerificationRecord } from '../pact/verification.ts'
 import { normalizeAddress } from '../nimiq/address.ts'
 import type {
   Activity,
@@ -18,11 +19,13 @@ import type {
   Pact,
   PactDetail,
   PactStatus,
+  PactVisibility,
   Participant,
   ParticipantRole,
   Payment,
   PaymentStatus,
   TrustMetrics,
+  VerificationRecord,
 } from '../pact/types.ts'
 import {
   RepoError,
@@ -250,6 +253,8 @@ export class MemoryRepository implements Repository {
     const pact: Pact = {
       id,
       shortId: '', // filled in below, once the digest exists
+      // Private until a participant deliberately says otherwise.
+      visibility: 'PRIVATE',
       title: input.title,
       deliverable: input.deliverable,
       createdBy: normalizeAddress(input.createdBy),
@@ -624,6 +629,24 @@ export class MemoryRepository implements Repository {
       return updated
     }
     throw new RepoError('NOT_FOUND', 'That proposal does not exist.')
+  }
+
+  // --- visibility -------------------------------------------------------------------
+
+  async setVisibility(pactId: string, actor: string, visibility: PactVisibility): Promise<PactDetail> {
+    this.roleOf(pactId, actor) // membership check
+    const pact = this.mustGet(pactId)
+    this.t.pacts.set(pactId, { ...pact, visibility, updatedAt: now() })
+    return this.hydrate(pactId)
+  }
+
+  async getVerificationRecord(shortId: string): Promise<VerificationRecord | null> {
+    const wanted = shortId.toUpperCase()
+    for (const pact of this.t.pacts.values()) {
+      if (pact.shortId !== wanted) continue
+      return toVerificationRecord(this.hydrate(pact.id))
+    }
+    return null
   }
 
   // --- disputes ---------------------------------------------------------------------

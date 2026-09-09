@@ -7,7 +7,11 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  Check,
   CircleCheck,
+  Copy,
+  Globe,
+  Lock,
   Hammer,
   MessageSquareReply,
   Package,
@@ -23,7 +27,7 @@ import { normalizeAddress } from '@/lib/nimiq/address'
 import { formatLongDate, relativeDeadline, relativeTime } from '@/lib/format'
 import { DISPUTE_REASON_META, STATUS_META } from '@/lib/pact/state'
 import { EVM_CHAINS } from '@/lib/pact/types'
-import type { Milestone, PactDetail, ParticipantRole } from '@/lib/pact/types'
+import type { Milestone, PactDetail, PactVisibility, ParticipantRole } from '@/lib/pact/types'
 import type { UserFacingError } from '@/lib/errors'
 import { PactSeal } from '@/components/seal/PactSeal'
 import { Timeline } from '@/components/pact/Timeline'
@@ -66,6 +70,7 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
   const [error, setError] = useState<UserFacingError | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [copiedLink, setCopiedLink] = useState(false)
   const [sheet, setSheet] = useState<SheetKind>(null)
   const [payTarget, setPayTarget] = useState<Milestone | null>(null)
 
@@ -150,6 +155,28 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
     }
   }
 
+  const changeVisibility = async (visibility: PactVisibility) => {
+    setBusy(true)
+    try {
+      await api(`/api/pacts/${id}/visibility`, { method: 'PATCH', body: { visibility } })
+      await load()
+    } catch (cause) {
+      setError(toUserFacing(cause))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const copyVerifyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(verifyUrl)
+      setCopiedLink(true)
+      setTimeout(() => setCopiedLink(false), 1600)
+    } catch {
+      // Clipboard is unavailable in some WebViews; the URL is visible on screen anyway.
+    }
+  }
+
   const closeDispute = async (disputeId: string, status: 'RESOLVED' | 'WITHDRAWN') => {
     setBusy(true)
     try {
@@ -172,6 +199,11 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
   const other = useMemo(() => pact?.participants.find((p) => p !== self), [pact, self])
   const openProposal = pact?.negotiations.find((n) => n.status === 'OPEN')
   const openDispute = pact?.disputes.find((d) => d.status === 'OPEN')
+  // Built client-side so it's whatever host the viewer is actually on — Vercel preview,
+  // production domain, or localhost — rather than a baked-in guess.
+  const verifyUrl = pact
+    ? `${typeof window === 'undefined' ? '' : window.location.origin}/verify/${pact.shortId}`
+    : ''
   const raisedByMe =
     openDispute != null && normalizeAddress(openDispute.raisedBy) === normalizeAddress(me?.address ?? '')
   const pendingDelivery = pact?.deliverables.find((d) => d.status === 'SUBMITTED')
@@ -460,6 +492,69 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
           )}
 
           <Fingerprint digest={pact.termsDigest} className="mt-2.5" />
+        </section>
+
+        {/* --- public record -------------------------------------------------------- */}
+        <section className="mb-7">
+          <SectionTitle>Public record</SectionTitle>
+          <div className="surface px-4 py-4">
+            {/* Explicitly "is it published", not "is it not private". A privacy control
+                has to fail closed: anything unexpected in this field must render as
+                private rather than as a live public link. */}
+            {pact.visibility !== 'SHAREABLE' && pact.visibility !== 'PUBLIC' ? (
+              <>
+                <div className="flex items-start gap-2.5">
+                  <Lock aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-chalk-faint" />
+                  <p className="text-small leading-relaxed text-chalk-muted">
+                    Only the two of you can see this agreement. Publishing gives it a link anyone can open to check
+                    that these terms were signed — without showing them your delivery notes, transaction references,
+                    or full wallet addresses.
+                  </p>
+                </div>
+                <Button
+                  variant="secondary"
+                  fullWidth
+                  className="mt-3.5"
+                  busy={busy}
+                  onClick={() => void changeVisibility('SHAREABLE')}
+                >
+                  <Globe aria-hidden className="h-4 w-4" />
+                  Publish a verification link
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="flex items-start gap-2.5">
+                  <Globe aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-jade" />
+                  <p className="text-small leading-relaxed text-chalk-muted">
+                    Anyone with this link can verify these terms were signed. They won’t see deliveries, payments, or
+                    full addresses.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void copyVerifyLink()}
+                  className="mt-3 flex w-full items-center justify-between gap-2 rounded-xl border border-white/[0.07] bg-black/25 px-3.5 py-3 text-left active:bg-black/40"
+                >
+                  <span className="tabular min-w-0 truncate text-[0.7rem] text-chalk-muted">{verifyUrl}</span>
+                  {copiedLink ? (
+                    <Check aria-hidden className="h-3.5 w-3.5 shrink-0 text-jade" />
+                  ) : (
+                    <Copy aria-hidden className="h-3.5 w-3.5 shrink-0 text-chalk-faint" />
+                  )}
+                </button>
+                <Button
+                  variant="ghost"
+                  fullWidth
+                  className="mt-2"
+                  busy={busy}
+                  onClick={() => void changeVisibility('PRIVATE')}
+                >
+                  Make private again
+                </Button>
+              </>
+            )}
+          </div>
         </section>
 
         {/* --- milestones ----------------------------------------------------------- */}

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { CURRENCIES, DISPUTE_REASONS, EVM_CHAINS, PACT_STATUSES } from '../pact/types.ts'
+import { CURRENCIES, DISPUTE_REASONS, EVM_CHAINS, PACT_STATUSES, PACT_VISIBILITIES } from '../pact/types.ts'
 import { isValidAddress } from '../nimiq/address.ts'
 
 /**
@@ -98,6 +98,10 @@ export const joinSchema = z.object({
 
 export const updateProfileSchema = z.object({
   displayName: text(80),
+})
+
+export const visibilitySchema = z.object({
+  visibility: z.enum(PACT_VISIBILITIES),
 })
 
 export const disputeSchema = z.object({

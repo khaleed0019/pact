@@ -240,10 +240,20 @@ export interface Activity {
   createdAt: string
 }
 
+/**
+ * Who can see an agreement.
+ *
+ * PRIVATE is the default and always will be. The other two are a deliberate act by a
+ * participant, not something PACT ever does on their behalf.
+ */
+export const PACT_VISIBILITIES = ['PRIVATE', 'SHAREABLE', 'PUBLIC'] as const
+export type PactVisibility = (typeof PACT_VISIBILITIES)[number]
+
 export interface Pact {
   id: string
   /** Short, shareable, human-typable. Used in invite links and the on-chain memo. */
   shortId: string
+  visibility: PactVisibility
   title: string
   deliverable: string
   createdBy: string
@@ -269,6 +279,49 @@ export interface PactDetail extends Pact {
   negotiations: Negotiation[]
   disputes: Dispute[]
   activities: Activity[]
+}
+
+/**
+ * What a non-participant is allowed to see.
+ *
+ * This type is the privacy boundary, which is why it is a separate shape rather than a
+ * `Partial<PactDetail>`: adding a field to a pact can't accidentally publish it, because
+ * nothing reaches this object unless someone wrote it here on purpose.
+ *
+ * What's here is the part that can be checked rather than believed — the terms digest,
+ * and each side's signature and public key over it. A reader who doesn't trust PACT's
+ * database can verify those independently, which is the difference between a record and
+ * a claim.
+ *
+ * What is deliberately not here: full wallet addresses (truncated instead, so a party can
+ * confirm their own without publishing a scrapeable list), deliverable notes and links,
+ * payment transaction references, negotiation messages, dispute detail, and the activity
+ * feed. "This agreement existed, said this, and both people signed it" does not require
+ * handing a stranger the contents of someone's working relationship.
+ */
+export interface VerificationRecord {
+  shortId: string
+  title: string
+  status: PactStatus
+  visibility: Exclude<PactVisibility, 'PRIVATE'>
+  currency: Currency
+  totalAmountMinor: string
+  deadline: string | null
+  termsDigest: string
+  parties: Array<{
+    role: ParticipantRole
+    displayName: string
+    /** Truncated (NQ26…2QFT), never the full string. */
+    addressPreview: string | null
+    sealSignature: string | null
+    sealPublicKey: string | null
+    sealedAt: string | null
+  }>
+  milestones: Array<{ position: number; title: string; amountMinor: string; status: MilestoneStatus; dueDate: string | null }>
+  /** Counts only — never the payments themselves. */
+  paymentsConfirmed: number
+  createdAt: string
+  updatedAt: string
 }
 
 export interface TrustMetrics {

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { canTransition, isTerminal, type Actor } from '../pact/state.ts'
 import { shortIdFromDigest, termsDigest, type CanonicalTerms } from '../pact/digest.ts'
 import { sumMinor } from '../pact/money.ts'
+import { toVerificationRecord } from '../pact/verification.ts'
 import { normalizeAddress } from '../nimiq/address.ts'
 import type {
   Activity,
@@ -19,11 +20,13 @@ import type {
   Pact,
   PactDetail,
   PactStatus,
+  PactVisibility,
   Participant,
   ParticipantRole,
   Payment,
   PaymentStatus,
   TrustMetrics,
+  VerificationRecord,
 } from '../pact/types.ts'
 import {
   RepoError,
@@ -55,7 +58,7 @@ import {
 
 // Money columns are cast to text everywhere they are read.
 const PACT_COLUMNS =
-  'id, short_id, title, deliverable, created_by, status, currency, chain, total_amount_minor::text, deadline, payment_condition, special_terms, terms_digest, created_at, updated_at'
+  'id, short_id, visibility, title, deliverable, created_by, status, currency, chain, total_amount_minor::text, deadline, payment_condition, special_terms, terms_digest, created_at, updated_at'
 const PARTICIPANT_COLUMNS =
   'id, pact_id, role, address, display_name, evm_address, seal_signature, seal_public_key, sealed_at, joined_at'
 const MILESTONE_COLUMNS =
@@ -72,6 +75,7 @@ function toPact(row: Row): Omit<Pact, 'participants' | 'milestones'> {
   return {
     id: str(row.id),
     shortId: str(row.short_id),
+    visibility: str(row.visibility) as Pact['visibility'],
     title: str(row.title),
     deliverable: str(row.deliverable),
     createdBy: str(row.created_by),
@@ -865,6 +869,31 @@ export class SupabaseRepository implements Repository {
       createdAt: str(found.created_at),
       resolvedAt: new Date().toISOString(),
     }
+  }
+
+  // --- visibility -------------------------------------------------------------------
+
+  async setVisibility(pactId: string, actor: string, visibility: PactVisibility): Promise<PactDetail> {
+    await this.roleOf(pactId, actor)
+    const { error } = await this.db.from('pacts').update({ visibility }).eq('id', pactId)
+    if (error) fail(error, 'Could not change who can see this.')
+    return this.hydrate(pactId)
+  }
+
+  async getVerificationRecord(shortId: string): Promise<VerificationRecord | null> {
+    const { data } = await this.db
+      .from('pacts')
+      .select('id, visibility')
+      .eq('short_id', shortId.toUpperCase())
+      .maybeSingle()
+
+    // Null rather than a 403 for a private pact: a caller must not be able to tell a
+    // private agreement apart from one that never existed. Allowlisted rather than
+    // excluding PRIVATE, so an unrecognised value withholds instead of publishing.
+    if (!data) return null
+    const visibility = str(data.visibility)
+    if (visibility !== 'SHAREABLE' && visibility !== 'PUBLIC') return null
+    return toVerificationRecord(await this.hydrate(str(data.id)))
   }
 
   // --- disputes ---------------------------------------------------------------------

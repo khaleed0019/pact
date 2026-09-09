@@ -15,11 +15,13 @@ import type {
   Pact,
   PactDetail,
   PactStatus,
+  PactVisibility,
   Participant,
   ParticipantRole,
   Payment,
   PaymentStatus,
   TrustMetrics,
+  VerificationRecord,
 } from '../pact/types.ts'
 
 /**
@@ -81,6 +83,16 @@ export interface Repository {
   listPactsForAddress(address: string): Promise<Pact[]>
   updateTerms(pactId: string, actor: string, patch: UpdateTermsInput): Promise<PactDetail>
   setStatus(pactId: string, actor: string, status: PactStatus): Promise<PactDetail>
+  /** Participants only. Publishing someone's agreement is not a thing PACT decides. */
+  setVisibility(pactId: string, actor: string, visibility: PactVisibility): Promise<PactDetail>
+  /**
+   * The unauthenticated read, by short id.
+   *
+   * Returns null for a private pact rather than throwing, so a caller cannot tell a
+   * private agreement apart from one that doesn't exist. Returns the redacted
+   * `VerificationRecord`, never a `PactDetail` — see that type for what is withheld.
+   */
+  getVerificationRecord(shortId: string): Promise<VerificationRecord | null>
 
   // --- participants and sealing -----------------------------------------------------
   joinPact(pactId: string, address: string, displayName: string): Promise<PactDetail>

@@ -239,6 +239,7 @@ function build(spec: SeedSpec): PactDetail {
   return {
     id: spec.id,
     shortId: shortIdFromDigest(digest),
+    visibility: 'PRIVATE',
     title: spec.title,
     deliverable: spec.deliverable,
     createdBy: addressOf('CLIENT') ?? '',

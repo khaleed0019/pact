@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { MemoryRepository } from '../lib/db/memory.ts'
 import { isRepoError } from '../lib/db/repo.ts'
+import { toVerificationRecord } from '../lib/pact/verification.ts'
 import type { CreatePactInput } from '../lib/db/repo.ts'
 
 /**
@@ -244,6 +245,76 @@ test('an explicit profile name wins over whatever a pact\'s participant row says
   await repo.createPact(draft({ creatorName: 'Khaleed' }))
   trust = await repo.getTrustMetrics(CLIENT)
   assert.equal(trust.displayName, 'Khaleed A.', 'the explicit edit is not overwritten by pact activity')
+})
+
+test('a private agreement is indistinguishable from one that never existed', async () => {
+  const repo = new MemoryRepository()
+  const created = await repo.createPact(draft())
+  assert.equal(created.visibility, 'PRIVATE', 'private is the default and has to stay that way')
+
+  assert.equal(await repo.getVerificationRecord(created.shortId), null)
+  assert.equal(await repo.getVerificationRecord('ZZZZZZZZ'), null, 'and so is a reference nobody ever issued')
+})
+
+test('an unrecognised visibility withholds rather than publishes', () => {
+  // The realistic way this happens is a row written before the column existed, or a
+  // value from a migration this build predates. Whatever the cause, failing open here
+  // means publishing someone's agreement, so the check is an allowlist and this pins it.
+  const base = { visibility: 'SHAREABLE', participants: [], milestones: [], payments: [] } as unknown as Parameters<
+    typeof toVerificationRecord
+  >[0]
+  assert.ok(toVerificationRecord(base), 'a genuinely shareable pact still resolves')
+
+  for (const bad of [undefined, null, '', 'private', 'Shareable', 'ANYTHING_ELSE']) {
+    const record = toVerificationRecord({ ...base, visibility: bad } as typeof base)
+    assert.equal(record, null, `visibility ${JSON.stringify(bad)} must not publish`)
+  }
+})
+
+test('a published record exposes the signatures but not the private material', async () => {
+  const repo = new MemoryRepository()
+  const created = await repo.createPact(draft())
+  await seal(repo, created.id)
+  await repo.setVisibility(created.id, CLIENT, 'SHAREABLE')
+
+  const record = await repo.getVerificationRecord(created.shortId)
+  assert.ok(record, 'a shareable pact resolves by short id')
+
+  // The checkable part is present.
+  assert.equal(record.termsDigest, created.termsDigest)
+  assert.ok(record.parties.every((p) => p.sealSignature && p.sealPublicKey))
+
+  // The private part is not, at any depth. Serialising and scanning the whole payload
+  // catches a field someone adds later without thinking about this boundary.
+  const serialised = JSON.stringify(record)
+  assert.ok(!serialised.includes(CLIENT), 'full wallet addresses must never appear')
+  assert.ok(!serialised.includes(PROVIDER), 'full wallet addresses must never appear')
+  assert.ok(!('activities' in record), 'the activity feed is not public')
+  assert.ok(!('deliverables' in record), 'delivery notes and links are not public')
+  assert.ok(!('payments' in record), 'transaction references are not public')
+  assert.ok(!('disputes' in record), 'dispute detail is not public')
+})
+
+test('publishing can be undone', async () => {
+  const repo = new MemoryRepository()
+  const created = await repo.createPact(draft())
+
+  await repo.setVisibility(created.id, PROVIDER, 'PUBLIC')
+  assert.ok(await repo.getVerificationRecord(created.shortId))
+
+  // Either party can pull it back, without needing the other's agreement.
+  await repo.setVisibility(created.id, CLIENT, 'PRIVATE')
+  assert.equal(await repo.getVerificationRecord(created.shortId), null)
+})
+
+test('a stranger cannot publish someone else’s agreement', async () => {
+  const repo = new MemoryRepository()
+  const created = await repo.createPact(draft())
+
+  await assert.rejects(
+    () => repo.setVisibility(created.id, STRANGER, 'PUBLIC'),
+    (cause: unknown) => isRepoError(cause) && cause.kind === 'NOT_ALLOWED',
+  )
 })
 
 test('only one issue can be open on an agreement at a time', async () => {
