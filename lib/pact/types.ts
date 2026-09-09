@@ -5,6 +5,7 @@
  * routes validate against them (see `schema.ts`), and the UI renders them. Nothing
  * here knows about React, Supabase, or the Nimiq provider.
  */
+import type { PactCategory } from './categories.ts'
 
 export const PACT_STATUSES = [
   'DRAFT',
@@ -254,6 +255,8 @@ export interface Pact {
   /** Short, shareable, human-typable. Used in invite links and the on-chain memo. */
   shortId: string
   visibility: PactVisibility
+  /** Decides the role labels, whether money is involved, and what the builder asks for. */
+  category: PactCategory
   title: string
   deliverable: string
   createdBy: string
@@ -303,6 +306,7 @@ export interface VerificationRecord {
   shortId: string
   title: string
   status: PactStatus
+  category: PactCategory
   visibility: Exclude<PactVisibility, 'PRIVATE'>
   currency: Currency
   totalAmountMinor: string

@@ -14,6 +14,7 @@ import type {
   ParticipantRole,
   Payment,
 } from '../pact/types.ts'
+import type { PactCategory } from '../pact/categories.ts'
 
 /**
  * Demo mode.
@@ -66,6 +67,7 @@ function timeOffset(days: number, hours = 0): string {
 
 interface SeedSpec {
   id: string
+  category?: PactCategory
   title: string
   deliverable: string
   status: PactStatus
@@ -240,6 +242,7 @@ function build(spec: SeedSpec): PactDetail {
     id: spec.id,
     shortId: shortIdFromDigest(digest),
     visibility: 'PRIVATE',
+    category: spec.category ?? 'FREELANCE',
     title: spec.title,
     deliverable: spec.deliverable,
     createdBy: addressOf('CLIENT') ?? '',

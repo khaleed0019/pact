@@ -58,7 +58,7 @@ import {
 
 // Money columns are cast to text everywhere they are read.
 const PACT_COLUMNS =
-  'id, short_id, visibility, title, deliverable, created_by, status, currency, chain, total_amount_minor::text, deadline, payment_condition, special_terms, terms_digest, created_at, updated_at'
+  'id, short_id, visibility, category, title, deliverable, created_by, status, currency, chain, total_amount_minor::text, deadline, payment_condition, special_terms, terms_digest, created_at, updated_at'
 const PARTICIPANT_COLUMNS =
   'id, pact_id, role, address, display_name, evm_address, seal_signature, seal_public_key, sealed_at, joined_at'
 const MILESTONE_COLUMNS =
@@ -76,6 +76,7 @@ function toPact(row: Row): Omit<Pact, 'participants' | 'milestones'> {
     id: str(row.id),
     shortId: str(row.short_id),
     visibility: str(row.visibility) as Pact['visibility'],
+    category: str(row.category) as Pact['category'],
     title: str(row.title),
     deliverable: str(row.deliverable),
     createdBy: str(row.created_by),

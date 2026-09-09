@@ -23,6 +23,7 @@ import type {
   TrustMetrics,
   VerificationRecord,
 } from '../pact/types.ts'
+import type { PactCategory } from '../pact/categories.ts'
 
 /**
  * The storage contract.
@@ -38,6 +39,7 @@ import type {
 
 export interface CreatePactInput {
   createdBy: string
+  category: PactCategory
   creatorRole: ParticipantRole
   creatorName: string
   counterpartyName: string

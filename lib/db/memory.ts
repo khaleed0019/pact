@@ -255,6 +255,7 @@ export class MemoryRepository implements Repository {
       shortId: '', // filled in below, once the digest exists
       // Private until a participant deliberately says otherwise.
       visibility: 'PRIVATE',
+      category: input.category,
       title: input.title,
       deliverable: input.deliverable,
       createdBy: normalizeAddress(input.createdBy),

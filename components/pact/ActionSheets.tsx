@@ -10,6 +10,7 @@ import { api, toUserFacing } from '@/lib/client/api'
 import { formatWithCurrency } from '@/lib/pact/money'
 import { formatLongDate } from '@/lib/format'
 import { DISPUTE_REASON_META } from '@/lib/pact/state'
+import { usesPayment } from '@/lib/pact/categories'
 import { cn } from '@/lib/cn'
 import type { Explanation } from '@/lib/ai/schema'
 import { DISPUTE_REASONS, type DisputeReason, type Milestone, type PactDetail } from '@/lib/pact/types'
@@ -108,12 +109,17 @@ export function DeliverySheet({
 
 // --- negotiation --------------------------------------------------------------------
 
-/** Fields PACT can apply automatically when a proposal is accepted. */
+/**
+ * Fields PACT can apply automatically when a proposal is accepted.
+ *
+ * The two money fields are only offered when the category has money in it — proposing a
+ * change to the amount of a commitment is a change to a number that does not exist.
+ */
 const NEGOTIABLE = [
-  { field: 'deadline', label: 'Deadline', kind: 'date' as const },
-  { field: 'totalAmount', label: 'Amount', kind: 'text' as const },
-  { field: 'paymentCondition', label: 'Payment condition', kind: 'text' as const },
-  { field: 'deliverable', label: 'What’s delivered', kind: 'text' as const },
+  { field: 'deadline', label: 'Deadline', kind: 'date' as const, money: false },
+  { field: 'totalAmount', label: 'Amount', kind: 'text' as const, money: true },
+  { field: 'paymentCondition', label: 'Payment condition', kind: 'text' as const, money: true },
+  { field: 'deliverable', label: 'What’s delivered', kind: 'text' as const, money: false },
 ]
 
 export function NegotiationSheet({
@@ -132,6 +138,8 @@ export function NegotiationSheet({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<UserFacingError | null>(null)
 
+  const negotiable = NEGOTIABLE.filter((entry) => !entry.money || usesPayment(pact.category))
+
   const currentValue = (field: string): string => {
     switch (field) {
       case 'deadline':
@@ -147,7 +155,7 @@ export function NegotiationSheet({
     }
   }
 
-  const active = NEGOTIABLE.filter((entry) => {
+  const active = negotiable.filter((entry) => {
     const proposed = changes[entry.field]
     return proposed !== undefined && proposed.trim() !== '' && proposed.trim() !== currentValue(entry.field).trim()
   })
@@ -200,7 +208,7 @@ export function NegotiationSheet({
       }
     >
       <div className="space-y-4 py-1">
-        {NEGOTIABLE.map((entry) => (
+        {negotiable.map((entry) => (
           <Field key={entry.field} label={entry.label}>
             {({ inputId }) => (
               <div className="space-y-1.5">

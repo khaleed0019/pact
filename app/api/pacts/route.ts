@@ -37,6 +37,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const repo = getRepository()
     const pact = await repo.createPact({
       createdBy: session.address,
+      category: input.category,
       creatorRole: input.creatorRole,
       creatorName: input.creatorName,
       counterpartyName: input.counterpartyName,

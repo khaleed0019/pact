@@ -10,6 +10,7 @@ import { PactSeal } from '@/components/seal/PactSeal'
 import { api, toUserFacing } from '@/lib/client/api'
 import { signMessage } from '@/lib/nimiq/provider'
 import { formatLongDate } from '@/lib/format'
+import { roleLabel, usesPayment } from '@/lib/pact/categories'
 import type { PactDetail } from '@/lib/pact/types'
 import type { UserFacingError } from '@/lib/errors'
 
@@ -149,13 +150,15 @@ export function SealSheet({
         <dl className="surface-quiet divide-y divide-white/[0.06]">
           <Row label="Agreement">{pact.title}</Row>
           <Row label="Deliverable">{pact.deliverable}</Row>
-          <Row label="Value">
-            <Money minor={pact.totalAmountMinor} currency={pact.currency} className="text-chalk" />
-          </Row>
+          {usesPayment(pact.category) && (
+            <Row label="Value">
+              <Money minor={pact.totalAmountMinor} currency={pact.currency} className="text-chalk" />
+            </Row>
+          )}
           <Row label="Deadline">{pact.deadline ? formatLongDate(pact.deadline) : 'No deadline set'}</Row>
-          <Row label="Payment">{pact.paymentCondition}</Row>
-          <Row label="Client">{client?.displayName ?? '—'}</Row>
-          <Row label="Provider">{provider?.displayName ?? '—'}</Row>
+          {usesPayment(pact.category) && <Row label="Payment">{pact.paymentCondition}</Row>}
+          <Row label={roleLabel(pact.category, 'CLIENT')}>{client?.displayName ?? '—'}</Row>
+          <Row label={roleLabel(pact.category, 'PROVIDER')}>{provider?.displayName ?? '—'}</Row>
         </dl>
 
         {pact.milestones.length > 0 && (

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { CURRENCIES, DISPUTE_REASONS, EVM_CHAINS, PACT_STATUSES, PACT_VISIBILITIES } from '../pact/types.ts'
+import { PACT_CATEGORIES, usesPayment } from '../pact/categories.ts'
 import { isValidAddress } from '../nimiq/address.ts'
 
 /**
@@ -20,6 +21,17 @@ export const minorAmount = z
   .string()
   .regex(/^\d{1,30}$/, 'Amount must be a whole number of minor units.')
   .refine((value) => BigInt(value) > 0n, 'Amount must be greater than zero.')
+
+/**
+ * Same shape, but zero is allowed.
+ *
+ * Only the pact total uses this. A payment or a milestone of zero is meaningless and
+ * stays rejected; a pact total of zero is how a commitment or a challenge says "there is
+ * no money in this agreement".
+ */
+export const minorAmountOrZero = z
+  .string()
+  .regex(/^\d{1,30}$/, 'Amount must be a whole number of minor units.')
 
 export const isoDate = z
   .string()
@@ -51,6 +63,7 @@ export const milestoneInput = z.object({
 
 export const createPactSchema = z
   .object({
+    category: z.enum(PACT_CATEGORIES).default('FREELANCE'),
     title: text(140),
     deliverable: text(2000),
     creatorRole: z.enum(['CLIENT', 'PROVIDER']),
@@ -59,9 +72,9 @@ export const createPactSchema = z
     counterpartyAddress: nimiqAddress.nullable().default(null),
     currency: z.enum(CURRENCIES),
     chain: z.enum(Object.keys(EVM_CHAINS) as [string, ...string[]]).nullable().default(null),
-    totalAmountMinor: minorAmount,
+    totalAmountMinor: minorAmountOrZero,
     deadline: isoDate.nullable().default(null),
-    paymentCondition: text(300),
+    paymentCondition: optionalText(300),
     specialTerms: z.array(text(300)).max(12).default([]),
     milestones: z.array(milestoneInput).max(12).default([]),
   })
@@ -71,6 +84,16 @@ export const createPactSchema = z
     message: 'USDT agreements need a network, and NIM agreements must not have one.',
     path: ['chain'],
   })
+  // The category decides whether money is part of this at all, and the two must agree:
+  // a freelance job for nothing is a mistake, and a commitment for 50 NIM is a payment
+  // agreement wearing the wrong label.
+  .refine(
+    (value) => (usesPayment(value.category) ? BigInt(value.totalAmountMinor) > 0n : value.totalAmountMinor === '0'),
+    {
+      message: 'This kind of agreement doesn’t take an amount.',
+      path: ['totalAmountMinor'],
+    },
+  )
 
 export const updateTermsSchema = z.object({
   title: text(140).optional(),

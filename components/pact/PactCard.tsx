@@ -7,6 +7,7 @@ import { Money, StatusPill } from '@/components/ui/Bits'
 import { relativeDeadline } from '@/lib/format'
 import { normalizeAddress } from '@/lib/nimiq/address'
 import { isTerminal } from '@/lib/pact/state'
+import { roleSelfLabel, usesPayment } from '@/lib/pact/categories'
 import { cn } from '@/lib/cn'
 import type { Pact } from '@/lib/pact/types'
 
@@ -58,12 +59,14 @@ export function PactCard({
           </div>
 
           <p className="mt-0.5 truncate text-small text-chalk-muted">
-            {self?.role === 'CLIENT' ? 'You’re paying' : 'You’re delivering'}
+            {roleSelfLabel(pact.category, self?.role ?? 'PROVIDER')}
             {other ? ` · ${other.displayName}` : ''}
           </p>
 
           <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <Money minor={pact.totalAmountMinor} currency={pact.currency} size="sm" className="text-chalk" />
+            {usesPayment(pact.category) && (
+              <Money minor={pact.totalAmountMinor} currency={pact.currency} size="sm" className="text-chalk" />
+            )}
             <StatusPill status={pact.status} />
             {deadline && (
               <span

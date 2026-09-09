@@ -8,6 +8,7 @@ import { api, toUserFacing } from '@/lib/client/api'
 import { formatWithCurrency } from '@/lib/pact/money'
 import { formatLongDate } from '@/lib/format'
 import { STATUS_META } from '@/lib/pact/state'
+import { categoryMeta, roleLabel, usesPayment } from '@/lib/pact/categories'
 import { PactSeal } from '@/components/seal/PactSeal'
 import { Button } from '@/components/ui/Button'
 import { ErrorNotice, Fingerprint, SectionTitle, Skeleton, StatusPill } from '@/components/ui/Bits'
@@ -95,9 +96,13 @@ export default function VerifyPage({ params }: { params: Promise<{ shortId: stri
           <StatusPill status={record.status} />
         </div>
         <p className="mt-2 text-small text-chalk-muted">{meta.blurb}</p>
-        <p className="tabular mt-4 text-title text-gold-bright">
-          {formatWithCurrency(record.totalAmountMinor, record.currency)}
-        </p>
+        {usesPayment(record.category) ? (
+          <p className="tabular mt-4 text-title text-gold-bright">
+            {formatWithCurrency(record.totalAmountMinor, record.currency)}
+          </p>
+        ) : (
+          <p className="mt-4 text-small text-chalk-faint">{categoryMeta(record.category).label} · no money involved</p>
+        )}
       </motion.header>
 
       {/* The claim, stated exactly. */}
@@ -136,7 +141,7 @@ export default function VerifyPage({ params }: { params: Promise<{ shortId: stri
                 <div className="min-w-0">
                   <p className="truncate text-small font-medium text-chalk">{party.displayName || 'Unnamed'}</p>
                   <p className="text-[0.7rem] text-chalk-faint">
-                    {party.role === 'CLIENT' ? 'Paying' : 'Delivering'}
+                    {roleLabel(record.category, party.role)}
                     {party.addressPreview && <span className="tabular"> · {party.addressPreview}</span>}
                   </p>
                 </div>
@@ -197,10 +202,9 @@ export default function VerifyPage({ params }: { params: Promise<{ shortId: stri
           <Row label="Created" value={formatLongDate(record.createdAt)} />
           <Row label="Last updated" value={formatLongDate(record.updatedAt)} />
           {record.deadline && <Row label="Deadline" value={formatLongDate(record.deadline)} />}
-          <Row
-            label="Payments recorded"
-            value={`${record.paymentsConfirmed} confirmed`}
-          />
+          {usesPayment(record.category) && (
+            <Row label="Payments recorded" value={`${record.paymentsConfirmed} confirmed`} />
+          )}
         </div>
       </section>
 

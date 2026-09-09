@@ -6,6 +6,7 @@ import { Check, Copy, Share2 } from 'lucide-react'
 import { PactSeal } from '@/components/seal/PactSeal'
 import { Button } from '@/components/ui/Button'
 import { Money } from '@/components/ui/Bits'
+import { usesPayment } from '@/lib/pact/categories'
 import type { Pact } from '@/lib/pact/types'
 
 /**
@@ -97,7 +98,9 @@ export function InvitePanel({ pact, token, onDone }: { pact: Pact; token: string
             <p className="truncate text-heading text-chalk">{pact.title}</p>
             <p className="mt-0.5 font-mono text-[0.7rem] text-chalk-faint">Ref {pact.shortId}</p>
           </div>
-          <Money minor={pact.totalAmountMinor} currency={pact.currency} size="lg" className="shrink-0 text-gold-bright" />
+          {usesPayment(pact.category) && (
+            <Money minor={pact.totalAmountMinor} currency={pact.currency} size="lg" className="shrink-0 text-gold-bright" />
+          )}
         </div>
       </div>
 

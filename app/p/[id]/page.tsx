@@ -26,6 +26,7 @@ import { hasEvmProvider } from '@/lib/nimiq/evm'
 import { normalizeAddress } from '@/lib/nimiq/address'
 import { formatLongDate, relativeDeadline, relativeTime } from '@/lib/format'
 import { DISPUTE_REASON_META, STATUS_META } from '@/lib/pact/state'
+import { categoryMeta, roleLabel, usesPayment } from '@/lib/pact/categories'
 import { EVM_CHAINS } from '@/lib/pact/types'
 import type { Milestone, PactDetail, PactVisibility, ParticipantRole } from '@/lib/pact/types'
 import type { UserFacingError } from '@/lib/errors'
@@ -316,7 +317,11 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
             )}
           </div>
           <p className="mt-2 text-small text-chalk-muted">{meta.blurb}</p>
-          <Money minor={pact.totalAmountMinor} currency={pact.currency} size="xl" className="mt-4 text-gold-bright" />
+          {usesPayment(pact.category) ? (
+            <Money minor={pact.totalAmountMinor} currency={pact.currency} size="xl" className="mt-4 text-gold-bright" />
+          ) : (
+            <p className="mt-4 text-small text-chalk-faint">{categoryMeta(pact.category).label}</p>
+          )}
           {pact.chain && (
             <p className="mt-1 text-[0.7rem] text-chalk-faint">
               on {EVM_CHAINS[pact.chain].name} · fees in {EVM_CHAINS[pact.chain].nativeSymbol}
@@ -446,7 +451,7 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
                     {participant === self && <span className="ml-1.5 text-chalk-faint">(you)</span>}
                   </p>
                   <p className="text-[0.7rem] text-chalk-faint">
-                    {participant.role === 'CLIENT' ? 'Paying' : 'Delivering'}
+                    {roleLabel(pact.category, participant.role)}
                   </p>
                 </div>
                 {participant.address ? (

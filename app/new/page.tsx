@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, Sparkles, Wand2 } from 'lucide-react'
+import { CATEGORY_META, PACT_CATEGORIES, usesPayment, type PactCategory } from '@/lib/pact/categories'
 import { useSession } from '@/lib/client/session'
 import { api, toUserFacing } from '@/lib/client/api'
 import { AmountError, toMinor } from '@/lib/pact/money'
@@ -34,19 +35,14 @@ import { InvitePanel } from '@/components/pact/InvitePanel'
  * apply rather than gates.
  */
 
-const EXAMPLES = [
-  'I want to hire John to design my website for 800 NIM. He should deliver by September 20 and I’ll pay after I approve the final design.',
-  'Selling my preset pack for 850 NIM, delivered as a download link once paid.',
-  'I need a video editor to edit 10 videos for 150 USDT by the 20th. Half upfront, half on delivery.',
-]
-
-type Step = 'describe' | 'refine' | 'done'
+type Step = 'category' | 'describe' | 'refine' | 'done'
 
 export default function NewPactPage() {
   const router = useRouter()
   const { me } = useSession()
 
-  const [step, setStep] = useState<Step>('describe')
+  const [step, setStep] = useState<Step>('category')
+  const [category, setCategory] = useState<PactCategory>('FREELANCE')
   const [description, setDescription] = useState('')
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT)
   const [review, setReview] = useState<ReviewState | null>(null)
@@ -61,6 +57,9 @@ export default function NewPactPage() {
   const [created, setCreated] = useState<{ pact: Pact; token: string } | null>(null)
 
   const patch = useCallback((next: Partial<Draft>) => setDraft((current) => ({ ...current, ...next })), [])
+
+  /** Whether this kind of agreement involves money at all. Drives which fields exist. */
+  const takesMoney = usesPayment(category)
 
   /** Minor units for the current amount, or null while it is empty or malformed. */
   const totalMinor = useMemo(() => {
@@ -201,10 +200,12 @@ export default function NewPactPage() {
     if (!draft.deliverable.trim()) errors.deliverable = 'Say what is being delivered.'
     if (!draft.counterpartyName.trim()) errors.counterpartyName = 'Who is this with?'
 
-    try {
-      toMinor(draft.amount, draft.currency)
-    } catch (cause) {
-      errors.amount = cause instanceof AmountError ? cause.message : 'Enter a valid amount.'
+    if (takesMoney) {
+      try {
+        toMinor(draft.amount, draft.currency)
+      } catch (cause) {
+        errors.amount = cause instanceof AmountError ? cause.message : 'Enter a valid amount.'
+      }
     }
 
     if (draft.counterpartyAddress.trim() && !isValidAddress(draft.counterpartyAddress)) {
@@ -238,11 +239,14 @@ export default function NewPactPage() {
           creatorName: draft.creatorName || me?.displayName || 'You',
           counterpartyName: draft.counterpartyName,
           counterpartyAddress: draft.counterpartyAddress.trim() || null,
+          category,
           currency: draft.currency,
           chain: draft.chain,
-          totalAmountMinor: toMinor(draft.amount, draft.currency),
+          // Zero is how a commitment or challenge says there is no money in this. The
+          // server rejects the mismatch either way, so this can't quietly disagree.
+          totalAmountMinor: takesMoney ? toMinor(draft.amount, draft.currency) : '0',
           deadline: draft.deadline || null,
-          paymentCondition: draft.paymentCondition || 'On delivery',
+          paymentCondition: takesMoney ? draft.paymentCondition || 'On delivery' : '',
           specialTerms: draft.specialTerms,
           milestones: draft.milestones.map((m) => ({
             title: m.title,
@@ -283,22 +287,62 @@ export default function NewPactPage() {
     <main className="safe-top mx-auto w-full max-w-[34rem] px-5 pb-32">
       <header className="flex items-center gap-2 py-3">
         <Link
-          href={step === 'refine' ? '#' : '/'}
+          href={step === 'category' ? '/' : '#'}
           onClick={(event) => {
-            if (step === 'refine') {
-              event.preventDefault()
-              setStep('describe')
-            }
+            // Walk back through the chain rather than leaving, except from the first step.
+            if (step === 'category') return
+            event.preventDefault()
+            setStep(step === 'refine' ? 'describe' : 'category')
           }}
           aria-label="Back"
           className="-ml-2 flex h-tap w-tap items-center justify-center rounded-full text-chalk-muted active:bg-white/10"
         >
           <ArrowLeft aria-hidden className="h-5 w-5" />
         </Link>
-        <h1 className="text-heading text-chalk">{step === 'describe' ? 'New agreement' : 'Check the details'}</h1>
+        <h1 className="text-heading text-chalk">
+          {step === 'category' ? 'New agreement' : step === 'describe' ? CATEGORY_META[category].label : 'Check the details'}
+        </h1>
       </header>
 
-      {step === 'describe' ? (
+      {step === 'category' ? (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+          <div className="mb-6">
+            <h2 className="text-display text-chalk">What kind of agreement?</h2>
+            <p className="mt-2 text-body leading-relaxed text-chalk-muted">
+              This decides what PACT asks you for, and what the two of you are called.
+            </p>
+          </div>
+
+          <div className="space-y-2.5">
+            {PACT_CATEGORIES.map((value) => {
+              const meta = CATEGORY_META[value]
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => {
+                    setCategory(value)
+                    setStep('describe')
+                    window.scrollTo({ top: 0 })
+                  }}
+                  className="flex min-h-tap w-full items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-4 text-left transition-colors duration-150 active:bg-white/[0.07]"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-body font-semibold text-chalk">{meta.label}</span>
+                    <span className="mt-0.5 block text-small leading-relaxed text-chalk-muted">{meta.blurb}</span>
+                    {!meta.usesPayment && (
+                      <span className="mt-1.5 inline-block rounded-full border border-white/[0.09] px-2 py-0.5 text-[0.65rem] text-chalk-faint">
+                        No money involved
+                      </span>
+                    )}
+                  </span>
+                  <ArrowRight aria-hidden className="h-4 w-4 shrink-0 text-chalk-faint" />
+                </button>
+              )
+            })}
+          </div>
+        </motion.div>
+      ) : step === 'describe' ? (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
           <div className="mb-5">
             <h2 className="text-display text-chalk">Describe the deal.</h2>
@@ -307,7 +351,7 @@ export default function NewPactPage() {
             </p>
           </div>
 
-          <Field label="What did you agree?" hint="Include what, how much, and by when.">
+          <Field label="What did you agree?" hint={CATEGORY_META[category].hint}>
             {({ inputId, describedBy }) => (
               <TextArea
                 id={inputId}
@@ -315,7 +359,7 @@ export default function NewPactPage() {
                 rows={6}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
-                placeholder="I want to hire John to design my website for 800 NIM…"
+                placeholder={CATEGORY_META[category].placeholder}
                 maxLength={4000}
               />
             )}
@@ -324,7 +368,7 @@ export default function NewPactPage() {
           <div className="mt-5">
             <SectionTitle>Or start from an example</SectionTitle>
             <div className="space-y-2">
-              {EXAMPLES.map((example) => (
+              {CATEGORY_META[category].examples.map((example) => (
                 <button
                   key={example}
                   type="button"
@@ -398,9 +442,11 @@ export default function NewPactPage() {
                   label="Your role"
                   value={draft.creatorRole}
                   onChange={(role) => patch({ creatorRole: role })}
+                  // Labelled from the category, so a commitment reads "I'm committing"
+                  // rather than asking someone which of them is "paying" for a promise.
                   options={[
-                    { value: 'CLIENT', label: 'I’m paying', hint: 'client' },
-                    { value: 'PROVIDER', label: 'I’m delivering', hint: 'provider' },
+                    { value: 'CLIENT', label: `I’m ${CATEGORY_META[category].roles.CLIENT.label.toLowerCase()}` },
+                    { value: 'PROVIDER', label: `I’m ${CATEGORY_META[category].roles.PROVIDER.label.toLowerCase()}` },
                   ]}
                 />
               )}
@@ -440,7 +486,10 @@ export default function NewPactPage() {
             </Field>
           </section>
 
-          <section className="space-y-4">
+          {/* A commitment or a challenge has no money in it, so the whole section is
+              absent rather than present-but-zeroed. An amount field showing 0 invites the
+              question "zero of what?", which is a question this agreement shouldn't raise. */}
+          <section className={takesMoney ? 'space-y-4' : 'hidden'} aria-hidden={!takesMoney}>
             <SectionTitle>Money</SectionTitle>
 
             <Field label="Paid in">

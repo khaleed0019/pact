@@ -140,6 +140,7 @@ function pact(overrides: Partial<Pact>): Pact {
     id: Math.random().toString(36).slice(2),
     shortId: 'ABCD1234',
     visibility: 'PRIVATE',
+    category: 'FREELANCE',
     title: 'Test',
     deliverable: 'Something',
     createdBy: ME,

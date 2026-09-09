@@ -25,6 +25,7 @@ export function toVerificationRecord(pact: PactDetail): VerificationRecord | nul
     shortId: pact.shortId,
     title: pact.title,
     status: pact.status,
+    category: pact.category,
     visibility: pact.visibility,
     currency: pact.currency,
     totalAmountMinor: pact.totalAmountMinor,

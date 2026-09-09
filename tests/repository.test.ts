@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { MemoryRepository } from '../lib/db/memory.ts'
 import { isRepoError } from '../lib/db/repo.ts'
 import { toVerificationRecord } from '../lib/pact/verification.ts'
+import { CATEGORY_META, PACT_CATEGORIES, roleLabel, usesPayment } from '../lib/pact/categories.ts'
 import type { CreatePactInput } from '../lib/db/repo.ts'
 
 /**
@@ -21,6 +22,7 @@ const STRANGER = 'NQ710000000000000000000000000000000'
 function draft(overrides: Partial<CreatePactInput> = {}): CreatePactInput {
   return {
     createdBy: CLIENT,
+    category: 'FREELANCE',
     creatorRole: 'CLIENT',
     creatorName: 'Khaleed',
     counterpartyName: 'John',
@@ -245,6 +247,50 @@ test('an explicit profile name wins over whatever a pact\'s participant row says
   await repo.createPact(draft({ creatorName: 'Khaleed' }))
   trust = await repo.getTrustMetrics(CLIENT)
   assert.equal(trust.displayName, 'Khaleed A.', 'the explicit edit is not overwritten by pact activity')
+})
+
+test('a money-free category keeps its role labels and takes no amount', async () => {
+  const repo = new MemoryRepository()
+  const created = await repo.createPact(draft({ category: 'COMMITMENT', totalAmountMinor: '0' }))
+
+  assert.equal(created.category, 'COMMITMENT')
+  assert.equal(usesPayment(created.category), false)
+
+  // The two sides stop being "Paying" and "Delivering", which is the whole reason the
+  // category exists rather than being a label on the card.
+  assert.equal(roleLabel(created.category, 'PROVIDER'), 'Committing')
+  assert.equal(roleLabel(created.category, 'CLIENT'), 'Holding them to it')
+
+  // And a freelance pact is unchanged by any of this.
+  const freelance = await repo.createPact(draft())
+  assert.equal(roleLabel(freelance.category, 'CLIENT'), 'Paying')
+  assert.equal(usesPayment(freelance.category), true)
+})
+
+test('an unrecognised category renders instead of crashing', () => {
+  // The list screen touches every pact at once, so one row with a category this build
+  // doesn't know — written by an older deploy, or a newer one — used to throw a
+  // TypeError on `.roles` and take the whole page down with it.
+  for (const bad of [undefined, null, '', 'GROUP', 'freelance']) {
+    const category = bad as unknown as Parameters<typeof roleLabel>[0]
+    assert.doesNotThrow(() => roleLabel(category, 'CLIENT'), `roleLabel threw for ${JSON.stringify(bad)}`)
+    assert.doesNotThrow(() => usesPayment(category), `usesPayment threw for ${JSON.stringify(bad)}`)
+    assert.equal(roleLabel(category, 'CLIENT'), 'Paying', 'falls back to what every pact was before categories')
+  }
+})
+
+test('every category has complete display metadata', () => {
+  // A category added without labels would render blank strings in the participants list
+  // rather than failing, so this walks the whole set instead of trusting the type.
+  for (const category of PACT_CATEGORIES) {
+    const meta = CATEGORY_META[category]
+    assert.ok(meta, `${category} has no metadata`)
+    assert.ok(meta.label && meta.blurb && meta.placeholder, `${category} is missing copy`)
+    for (const role of ['CLIENT', 'PROVIDER'] as const) {
+      assert.ok(meta.roles[role].label, `${category}/${role} has no label`)
+      assert.ok(meta.roles[role].self.startsWith('You'), `${category}/${role} self label must address the reader`)
+    }
+  }
 })
 
 test('a private agreement is indistinguishable from one that never existed', async () => {
