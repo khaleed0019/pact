@@ -255,6 +255,10 @@ function build(spec: SeedSpec): PactDetail {
     payments,
     deliverables,
     negotiations,
+    // The demo scenarios deliberately show the happy paths and one negotiation. None of
+    // them models a disagreement — a seeded dispute would put words in a fake person's
+    // mouth on a screen that exists to record what someone actually said.
+    disputes: [],
     activities,
     createdAt,
     updatedAt: timeOffset(-1),

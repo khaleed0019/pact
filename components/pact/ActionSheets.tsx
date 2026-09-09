@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowRight, ExternalLink, Package, Sparkles } from 'lucide-react'
+import { AlertTriangle, ArrowRight, ExternalLink, Package, Sparkles } from 'lucide-react'
 import { Sheet } from '@/components/ui/Sheet'
 import { Button } from '@/components/ui/Button'
 import { Field, TextArea, TextInput } from '@/components/ui/Field'
@@ -9,8 +9,10 @@ import { AiDisclaimer, ErrorNotice } from '@/components/ui/Bits'
 import { api, toUserFacing } from '@/lib/client/api'
 import { formatWithCurrency } from '@/lib/pact/money'
 import { formatLongDate } from '@/lib/format'
+import { DISPUTE_REASON_META } from '@/lib/pact/state'
+import { cn } from '@/lib/cn'
 import type { Explanation } from '@/lib/ai/schema'
-import type { Milestone, PactDetail } from '@/lib/pact/types'
+import { DISPUTE_REASONS, type DisputeReason, type Milestone, type PactDetail } from '@/lib/pact/types'
 import type { UserFacingError } from '@/lib/errors'
 
 /** The three lighter action sheets: submit work, propose changes, explain the deal. */
@@ -243,6 +245,137 @@ export function NegotiationSheet({
         <p className="px-1 text-[0.7rem] leading-relaxed text-chalk-faint">
           If they accept, the terms change — which means both of you will need to sign again.
         </p>
+
+        {error && <ErrorNotice error={error} />}
+      </div>
+    </Sheet>
+  )
+}
+
+// --- dispute ------------------------------------------------------------------------
+
+export function DisputeSheet({
+  open,
+  onClose,
+  pact,
+  onRaised,
+}: {
+  open: boolean
+  onClose: () => void
+  pact: PactDetail
+  onRaised: () => void
+}) {
+  const [reason, setReason] = useState<DisputeReason | null>(null)
+  const [detail, setDetail] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<UserFacingError | null>(null)
+
+  const submit = async () => {
+    if (!reason || detail.trim().length === 0) return
+    setBusy(true)
+    setError(null)
+    try {
+      await api(`/api/pacts/${pact.id}/disputes`, {
+        method: 'POST',
+        body: { reason, detail: detail.trim() },
+      })
+      setReason(null)
+      setDetail('')
+      onRaised()
+      onClose()
+    } catch (cause) {
+      setError(toUserFacing(cause))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Raise an issue"
+      description="This is recorded on the timeline and the other side sees it immediately."
+      footer={
+        <Button
+          size="lg"
+          variant="danger"
+          fullWidth
+          busy={busy}
+          disabled={!reason || detail.trim().length === 0}
+          onClick={() => void submit()}
+        >
+          <AlertTriangle aria-hidden className="h-4 w-4" />
+          Raise this issue
+        </Button>
+      }
+    >
+      <div className="space-y-4 py-1">
+        <fieldset className="space-y-1.5">
+          <legend className="text-small font-medium text-chalk">What’s wrong?</legend>
+          <div className="space-y-2 pt-1">
+            {DISPUTE_REASONS.map((value) => {
+              const meta = DISPUTE_REASON_META[value]
+              const selected = reason === value
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => setReason(value)}
+                  className={cn(
+                    'min-h-tap w-full rounded-xl border px-3.5 py-3 text-left transition-colors duration-150',
+                    selected
+                      ? 'border-rose/45 bg-rose/[0.10]'
+                      : 'border-white/[0.08] bg-white/[0.02] active:bg-white/[0.06]',
+                  )}
+                >
+                  <span className={cn('block text-small font-medium', selected ? 'text-chalk' : 'text-chalk-muted')}>
+                    {meta.label}
+                  </span>
+                  <span className="mt-0.5 block text-[0.7rem] leading-relaxed text-chalk-faint">{meta.hint}</span>
+                </button>
+              )
+            })}
+          </div>
+        </fieldset>
+
+        <Field
+          label="What happened?"
+          hint="They see this word for word, so write it the way you’d say it to them."
+        >
+          {({ inputId, describedBy }) => (
+            <TextArea
+              id={inputId}
+              aria-describedby={describedBy}
+              rows={4}
+              value={detail}
+              onChange={(event) => setDetail(event.target.value)}
+              placeholder="The final files were due on the 12th and I haven’t received anything yet."
+              maxLength={1000}
+            />
+          )}
+        </Field>
+
+        {/* Saying plainly what this does and does not do. The alternative is a user who
+            thinks raising an issue claws their money back, and finds out otherwise later. */}
+        <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] px-3.5 py-3">
+          <h3 className="text-micro font-semibold uppercase tracking-[0.14em] text-chalk-faint">What happens next</h3>
+          <ul className="mt-2 space-y-1.5">
+            {[
+              'The agreement is marked as having an open issue, for both of you.',
+              'The other side sees your reason and your description, and can reply.',
+              'Either of you can mark it resolved once you’ve worked it out.',
+              'PACT doesn’t decide who’s right, and no payment is reversed or held.',
+            ].map((line) => (
+              <li key={line} className="flex gap-2 text-[0.7rem] leading-relaxed text-chalk-muted">
+                <span aria-hidden className="mt-[0.4rem] h-1 w-1 shrink-0 rounded-full bg-chalk-faint" />
+                {line}
+              </li>
+            ))}
+          </ul>
+        </div>
 
         {error && <ErrorNotice error={error} />}
       </div>

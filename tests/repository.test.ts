@@ -246,6 +246,79 @@ test('an explicit profile name wins over whatever a pact\'s participant row says
   assert.equal(trust.displayName, 'Khaleed A.', 'the explicit edit is not overwritten by pact activity')
 })
 
+test('only one issue can be open on an agreement at a time', async () => {
+  const repo = new MemoryRepository()
+  const created = await repo.createPact(draft())
+
+  const dispute = await repo.raiseDispute({
+    pactId: created.id,
+    raisedBy: CLIENT,
+    reason: 'NOT_DELIVERED',
+    detail: 'The files were due on the 12th and nothing has arrived.',
+  })
+  assert.equal(dispute.status, 'OPEN')
+
+  await assert.rejects(
+    () =>
+      repo.raiseDispute({
+        pactId: created.id,
+        raisedBy: PROVIDER,
+        reason: 'PAYMENT_MISSING',
+        detail: 'A second, competing issue.',
+      }),
+    (cause: unknown) => isRepoError(cause) && cause.kind === 'CONFLICT',
+    'a second open issue would leave the UI with two to choose between',
+  )
+
+  // Closed, so the agreement can have a new one later if something else goes wrong.
+  await repo.resolveDispute({ disputeId: dispute.id, actor: PROVIDER, status: 'RESOLVED' })
+  const reopened = await repo.raiseDispute({
+    pactId: created.id,
+    raisedBy: PROVIDER,
+    reason: 'PAYMENT_MISSING',
+    detail: 'Different problem, after the first was settled.',
+  })
+  assert.equal(reopened.status, 'OPEN')
+})
+
+test('only the person who raised an issue can withdraw it', async () => {
+  const repo = new MemoryRepository()
+  const created = await repo.createPact(draft())
+  const dispute = await repo.raiseDispute({
+    pactId: created.id,
+    raisedBy: CLIENT,
+    reason: 'LATE',
+    detail: 'The deadline has passed.',
+  })
+
+  await assert.rejects(
+    () => repo.resolveDispute({ disputeId: dispute.id, actor: PROVIDER, status: 'WITHDRAWN' }),
+    (cause: unknown) => isRepoError(cause) && cause.kind === 'NOT_ALLOWED',
+    'withdrawing someone else’s complaint would erase their side of the record',
+  )
+
+  // But either party can agree it's settled.
+  const resolved = await repo.resolveDispute({ disputeId: dispute.id, actor: PROVIDER, status: 'RESOLVED' })
+  assert.equal(resolved.status, 'RESOLVED')
+  assert.ok(resolved.resolvedAt, 'a closed issue records when it closed')
+})
+
+test('a stranger cannot raise an issue on someone else’s agreement', async () => {
+  const repo = new MemoryRepository()
+  const created = await repo.createPact(draft())
+
+  await assert.rejects(
+    () =>
+      repo.raiseDispute({
+        pactId: created.id,
+        raisedBy: STRANGER,
+        reason: 'OTHER',
+        detail: 'Nothing to do with me.',
+      }),
+    (cause: unknown) => isRepoError(cause) && cause.kind === 'NOT_ALLOWED',
+  )
+})
+
 test('reminders never repeat for the same reason', async () => {
   const repo = new MemoryRepository()
   const created = await repo.createPact(draft({ deadline: '2020-01-01' }))

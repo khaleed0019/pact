@@ -8,6 +8,9 @@ import type {
   Activity,
   ActivityKind,
   Deliverable,
+  Dispute,
+  DisputeReason,
+  DisputeStatus,
   Invitation,
   Milestone,
   Negotiation,
@@ -151,6 +154,19 @@ function toDeliverable(row: Row): Deliverable {
   }
 }
 
+function toDispute(row: Row): Dispute {
+  return {
+    id: str(row.id),
+    pactId: str(row.pact_id),
+    raisedBy: str(row.raised_by),
+    reason: str(row.reason) as DisputeReason,
+    detail: str(row.detail),
+    status: str(row.status) as DisputeStatus,
+    createdAt: str(row.created_at),
+    resolvedAt: nullable(row.resolved_at),
+  }
+}
+
 function toActivity(row: Row): Activity {
   return {
     id: str(row.id),
@@ -233,15 +249,17 @@ export class SupabaseRepository implements Repository {
   }
 
   private async hydrate(pactId: string): Promise<PactDetail> {
-    const [pactResult, participants, milestones, payments, deliverables, negotiations, activities] = await Promise.all([
-      this.db.from('pacts').select(PACT_COLUMNS).eq('id', pactId).maybeSingle(),
-      this.db.from('pact_participants').select(PARTICIPANT_COLUMNS).eq('pact_id', pactId).order('role'),
-      this.db.from('milestones').select(MILESTONE_COLUMNS).eq('pact_id', pactId).order('position'),
-      this.db.from('payments').select(PAYMENT_COLUMNS).eq('pact_id', pactId).order('created_at'),
-      this.db.from('deliverables').select('*').eq('pact_id', pactId).order('created_at'),
-      this.db.from('negotiations').select('*, negotiation_changes(*)').eq('pact_id', pactId).order('created_at'),
-      this.db.from('activities').select('*').eq('pact_id', pactId).order('created_at'),
-    ])
+    const [pactResult, participants, milestones, payments, deliverables, negotiations, disputes, activities] =
+      await Promise.all([
+        this.db.from('pacts').select(PACT_COLUMNS).eq('id', pactId).maybeSingle(),
+        this.db.from('pact_participants').select(PARTICIPANT_COLUMNS).eq('pact_id', pactId).order('role'),
+        this.db.from('milestones').select(MILESTONE_COLUMNS).eq('pact_id', pactId).order('position'),
+        this.db.from('payments').select(PAYMENT_COLUMNS).eq('pact_id', pactId).order('created_at'),
+        this.db.from('deliverables').select('*').eq('pact_id', pactId).order('created_at'),
+        this.db.from('negotiations').select('*, negotiation_changes(*)').eq('pact_id', pactId).order('created_at'),
+        this.db.from('disputes').select('*').eq('pact_id', pactId).order('created_at'),
+        this.db.from('activities').select('*').eq('pact_id', pactId).order('created_at'),
+      ])
 
     if (!pactResult.data) throw new RepoError('NOT_FOUND', 'That agreement does not exist.')
 
@@ -268,6 +286,7 @@ export class SupabaseRepository implements Repository {
         createdAt: str(row.created_at),
         resolvedAt: nullable(row.resolved_at),
       })),
+      disputes: ((disputes.data ?? []) as Row[]).map(toDispute),
       activities: ((activities.data ?? []) as Row[]).map(toActivity),
     }
   }
@@ -846,6 +865,64 @@ export class SupabaseRepository implements Repository {
       createdAt: str(found.created_at),
       resolvedAt: new Date().toISOString(),
     }
+  }
+
+  // --- disputes ---------------------------------------------------------------------
+
+  async raiseDispute(input: {
+    pactId: string
+    raisedBy: string
+    reason: DisputeReason
+    detail: string
+  }): Promise<Dispute> {
+    await this.roleOf(input.pactId, input.raisedBy)
+
+    const { data, error } = await this.db
+      .from('disputes')
+      .insert({
+        pact_id: input.pactId,
+        raised_by: normalizeAddress(input.raisedBy),
+        reason: input.reason,
+        detail: input.detail,
+        status: 'OPEN',
+      })
+      .select('*')
+      .single()
+
+    // Partial unique index: one OPEN dispute per agreement, decided in the database so
+    // two simultaneous taps can't both win.
+    if (error?.code === '23505') {
+      throw new RepoError('CONFLICT', 'There is already an open issue on this agreement.')
+    }
+    if (error || !data) fail(error, 'Could not record that issue.')
+
+    return toDispute(data as Row)
+  }
+
+  async resolveDispute(input: {
+    disputeId: string
+    actor: string
+    status: Exclude<DisputeStatus, 'OPEN'>
+  }): Promise<Dispute> {
+    const { data: found } = await this.db.from('disputes').select('*').eq('id', input.disputeId).maybeSingle()
+    if (!found) throw new RepoError('NOT_FOUND', 'That issue does not exist.')
+
+    const pactId = str(found.pact_id)
+    await this.roleOf(pactId, input.actor)
+
+    if (str(found.status) !== 'OPEN') throw new RepoError('CONFLICT', 'That issue is already closed.')
+    if (input.status === 'WITHDRAWN' && normalizeAddress(str(found.raised_by)) !== normalizeAddress(input.actor)) {
+      throw new RepoError('NOT_ALLOWED', 'Only the person who raised this can withdraw it.')
+    }
+
+    const resolvedAt = new Date().toISOString()
+    const { error } = await this.db
+      .from('disputes')
+      .update({ status: input.status, resolved_at: resolvedAt })
+      .eq('id', input.disputeId)
+    if (error) fail(error, 'Could not close that issue.')
+
+    return { ...toDispute(found as Row), status: input.status, resolvedAt }
   }
 
   // --- supporting records -----------------------------------------------------------

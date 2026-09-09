@@ -55,6 +55,7 @@ const ICONS: Record<ActivityKind, typeof Handshake> = {
   PACT_COMPLETED: CircleCheck,
   PACT_CANCELLED: Ban,
   ISSUE_RAISED: AlertTriangle,
+  ISSUE_RESOLVED: Handshake,
 }
 
 type Tone = 'gold' | 'jade' | 'azure' | 'rose' | 'violet' | 'neutral'
@@ -77,6 +78,7 @@ const TONES: Record<ActivityKind, Tone> = {
   PACT_COMPLETED: 'jade',
   PACT_CANCELLED: 'neutral',
   ISSUE_RAISED: 'rose',
+  ISSUE_RESOLVED: 'jade',
 }
 
 const TONE_CLASS: Record<Tone, { ring: string; icon: string; glow: string }> = {

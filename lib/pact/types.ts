@@ -176,6 +176,38 @@ export interface Negotiation {
   resolvedAt: string | null
 }
 
+/**
+ * Why someone flagged a problem.
+ *
+ * A closed list rather than free text alone, because the reason drives what the UI can
+ * say happens next — and because "they didn't deliver" and "they didn't pay" are the two
+ * failure modes this product exists around, so they should be countable, not buried in
+ * prose. `OTHER` keeps the list honest instead of forcing a bad fit.
+ */
+export const DISPUTE_REASONS = [
+  'NOT_DELIVERED',
+  'NOT_AS_AGREED',
+  'LATE',
+  'PAYMENT_MISSING',
+  'OTHER',
+] as const
+export type DisputeReason = (typeof DISPUTE_REASONS)[number]
+
+export const DISPUTE_STATUSES = ['OPEN', 'RESOLVED', 'WITHDRAWN'] as const
+export type DisputeStatus = (typeof DISPUTE_STATUSES)[number]
+
+export interface Dispute {
+  id: string
+  pactId: string
+  raisedBy: string
+  reason: DisputeReason
+  /** The raiser's own account of the problem. Shown to the other side verbatim. */
+  detail: string
+  status: DisputeStatus
+  createdAt: string
+  resolvedAt: string | null
+}
+
 export type ActivityKind =
   | 'PACT_CREATED'
   | 'PACT_SENT'
@@ -194,6 +226,7 @@ export type ActivityKind =
   | 'PACT_COMPLETED'
   | 'PACT_CANCELLED'
   | 'ISSUE_RAISED'
+  | 'ISSUE_RESOLVED'
 
 export interface Activity {
   id: string
@@ -234,6 +267,7 @@ export interface PactDetail extends Pact {
   payments: Payment[]
   deliverables: Deliverable[]
   negotiations: Negotiation[]
+  disputes: Dispute[]
   activities: Activity[]
 }
 

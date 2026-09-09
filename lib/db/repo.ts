@@ -3,6 +3,9 @@ import type {
   ActivityKind,
   Currency,
   Deliverable,
+  Dispute,
+  DisputeReason,
+  DisputeStatus,
   EvmChainKey,
   Invitation,
   Milestone,
@@ -139,6 +142,28 @@ export interface Repository {
     status: Negotiation['status']
   }): Promise<Negotiation>
 
+  // --- disputes ---------------------------------------------------------------------
+  /**
+   * Flag a problem. One open dispute per agreement, enforced in storage rather than by
+   * the caller, so two people hitting the button at once can't produce two.
+   */
+  raiseDispute(input: {
+    pactId: string
+    raisedBy: string
+    reason: DisputeReason
+    detail: string
+  }): Promise<Dispute>
+  /**
+   * Close one out. `RESOLVED` means the two of them worked it out; `WITHDRAWN` means the
+   * person who raised it took it back. PACT does not adjudicate, so there is deliberately
+   * no "upheld" or "rejected" — neither would be a thing this app could honestly decide.
+   */
+  resolveDispute(input: {
+    disputeId: string
+    actor: string
+    status: Exclude<DisputeStatus, 'OPEN'>
+  }): Promise<Dispute>
+
   // --- supporting records -----------------------------------------------------------
   addActivity(input: {
     pactId: string
@@ -197,4 +222,4 @@ export function isRepoError(cause: unknown): cause is RepoError {
   )
 }
 
-export type { Activity, Deliverable, Invitation, Milestone, Negotiation, Notification, Pact, PactDetail, Participant, Payment, TrustMetrics }
+export type { Activity, Deliverable, Dispute, Invitation, Milestone, Negotiation, Notification, Pact, PactDetail, Participant, Payment, TrustMetrics }

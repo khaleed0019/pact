@@ -1,4 +1,4 @@
-import type { PactStatus, ParticipantRole } from './types.ts'
+import type { DisputeReason, PactStatus, ParticipantRole } from './types.ts'
 
 /**
  * The pact lifecycle, as a pure function.
@@ -95,4 +95,39 @@ export const STATUS_META: Record<
   DISPUTED: { label: 'Issue raised', tone: 'rose', blurb: 'One side has flagged a problem.' },
   DECLINED: { label: 'Declined', tone: 'rose', blurb: 'The other side turned this down.' },
   CANCELLED: { label: 'Cancelled', tone: 'neutral', blurb: 'Called off before completion.' },
+}
+
+/**
+ * Dispute reasons, with the label the raiser picks and the line the *other* side reads.
+ *
+ * The second half matters more than the first. Being told "an issue was raised" helps
+ * nobody; being told which of the four things went wrong is the difference between a
+ * conversation and a standoff.
+ */
+export const DISPUTE_REASON_META: Record<DisputeReason, { label: string; hint: string; counterparty: string }> = {
+  NOT_DELIVERED: {
+    label: 'The work hasn’t been delivered',
+    hint: 'Nothing has arrived, or what arrived is incomplete.',
+    counterparty: 'They say the work hasn’t been delivered.',
+  },
+  NOT_AS_AGREED: {
+    label: 'It isn’t what we agreed',
+    hint: 'Something was delivered, but it doesn’t match the terms.',
+    counterparty: 'They say what was delivered doesn’t match the agreed terms.',
+  },
+  LATE: {
+    label: 'The deadline has passed',
+    hint: 'The agreed date has gone by without this being finished.',
+    counterparty: 'They say the agreed deadline has passed.',
+  },
+  PAYMENT_MISSING: {
+    label: 'Payment hasn’t arrived',
+    hint: 'Work was delivered, but the payment hasn’t come through.',
+    counterparty: 'They say a payment they were owed hasn’t arrived.',
+  },
+  OTHER: {
+    label: 'Something else',
+    hint: 'Explain it in your own words below.',
+    counterparty: 'They’ve flagged a problem outside the usual four.',
+  },
 }

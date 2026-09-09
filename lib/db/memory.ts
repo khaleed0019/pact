@@ -7,6 +7,9 @@ import type {
   Activity,
   ActivityKind,
   Deliverable,
+  Dispute,
+  DisputeReason,
+  DisputeStatus,
   Invitation,
   Milestone,
   Negotiation,
@@ -47,6 +50,7 @@ interface Tables {
   payments: Map<string, Payment[]>
   deliverables: Map<string, Deliverable[]>
   negotiations: Map<string, Negotiation[]>
+  disputes: Map<string, Dispute[]>
   activities: Map<string, Activity[]>
   invitations: Map<string, Invitation>
   notifications: Map<string, Notification[]>
@@ -64,6 +68,7 @@ function emptyTables(): Tables {
     profiles: new Map(),
     deliverables: new Map(),
     negotiations: new Map(),
+    disputes: new Map(),
     activities: new Map(),
     invitations: new Map(),
     notifications: new Map(),
@@ -82,13 +87,14 @@ export class MemoryRepository implements Repository {
   /** Used by the demo seeder to install fully-formed pacts without replaying the API. */
   installSeed(pacts: PactDetail[]) {
     for (const pact of pacts) {
-      const { payments, deliverables, negotiations, activities, participants, milestones, ...core } = pact
+      const { payments, deliverables, negotiations, disputes, activities, participants, milestones, ...core } = pact
       this.t.pacts.set(core.id, { ...core, participants, milestones })
       this.t.participants.set(core.id, participants)
       this.t.milestones.set(core.id, milestones)
       this.t.payments.set(core.id, payments)
       this.t.deliverables.set(core.id, deliverables)
       this.t.negotiations.set(core.id, negotiations)
+      this.t.disputes.set(core.id, disputes)
       this.t.activities.set(core.id, activities)
     }
   }
@@ -110,6 +116,7 @@ export class MemoryRepository implements Repository {
       payments: this.t.payments.get(pactId) ?? [],
       deliverables: this.t.deliverables.get(pactId) ?? [],
       negotiations: this.t.negotiations.get(pactId) ?? [],
+      disputes: this.t.disputes.get(pactId) ?? [],
       activities: [...(this.t.activities.get(pactId) ?? [])].sort((a, b) =>
         a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0,
       ),
@@ -617,6 +624,58 @@ export class MemoryRepository implements Repository {
       return updated
     }
     throw new RepoError('NOT_FOUND', 'That proposal does not exist.')
+  }
+
+  // --- disputes ---------------------------------------------------------------------
+
+  async raiseDispute(input: {
+    pactId: string
+    raisedBy: string
+    reason: DisputeReason
+    detail: string
+  }): Promise<Dispute> {
+    this.roleOf(input.pactId, input.raisedBy) // membership check
+    const existing = (this.t.disputes.get(input.pactId) ?? []).find((d) => d.status === 'OPEN')
+    if (existing) throw new RepoError('CONFLICT', 'There is already an open issue on this agreement.')
+
+    const dispute: Dispute = {
+      id: randomUUID(),
+      pactId: input.pactId,
+      raisedBy: normalizeAddress(input.raisedBy),
+      reason: input.reason,
+      detail: input.detail,
+      status: 'OPEN',
+      createdAt: now(),
+      resolvedAt: null,
+    }
+    this.push(this.t.disputes, input.pactId, dispute)
+    return dispute
+  }
+
+  async resolveDispute(input: {
+    disputeId: string
+    actor: string
+    status: Exclude<DisputeStatus, 'OPEN'>
+  }): Promise<Dispute> {
+    for (const [pactId, disputes] of this.t.disputes) {
+      const index = disputes.findIndex((d) => d.id === input.disputeId)
+      if (index === -1) continue
+
+      this.roleOf(pactId, input.actor)
+      const target = disputes[index]
+      if (target.status !== 'OPEN') throw new RepoError('CONFLICT', 'That issue is already closed.')
+      // Only the person who raised it can take it back; either side can agree it's settled.
+      if (input.status === 'WITHDRAWN' && normalizeAddress(target.raisedBy) !== normalizeAddress(input.actor)) {
+        throw new RepoError('NOT_ALLOWED', 'Only the person who raised this can withdraw it.')
+      }
+
+      const updated: Dispute = { ...target, status: input.status, resolvedAt: now() }
+      const next = [...disputes]
+      next[index] = updated
+      this.t.disputes.set(pactId, next)
+      return updated
+    }
+    throw new RepoError('NOT_FOUND', 'That issue does not exist.')
   }
 
   // --- activity, invites, trust -----------------------------------------------------

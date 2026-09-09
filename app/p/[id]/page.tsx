@@ -4,6 +4,7 @@ import { use, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   CircleCheck,
@@ -19,8 +20,8 @@ import { useSession } from '@/lib/client/session'
 import { api, toUserFacing } from '@/lib/client/api'
 import { hasEvmProvider } from '@/lib/nimiq/evm'
 import { normalizeAddress } from '@/lib/nimiq/address'
-import { formatLongDate, relativeDeadline } from '@/lib/format'
-import { STATUS_META } from '@/lib/pact/state'
+import { formatLongDate, relativeDeadline, relativeTime } from '@/lib/format'
+import { DISPUTE_REASON_META, STATUS_META } from '@/lib/pact/state'
 import { EVM_CHAINS } from '@/lib/pact/types'
 import type { Milestone, PactDetail, ParticipantRole } from '@/lib/pact/types'
 import type { UserFacingError } from '@/lib/errors'
@@ -28,7 +29,7 @@ import { PactSeal } from '@/components/seal/PactSeal'
 import { Timeline } from '@/components/pact/Timeline'
 import { PaymentSheet, payabilityReason } from '@/components/pact/PaymentSheet'
 import { SealSheet } from '@/components/pact/SealSheet'
-import { DeliverySheet, ExplainSheet, NegotiationSheet } from '@/components/pact/ActionSheets'
+import { DeliverySheet, DisputeSheet, ExplainSheet, NegotiationSheet } from '@/components/pact/ActionSheets'
 import { Button } from '@/components/ui/Button'
 import {
   AddressChip,
@@ -54,7 +55,7 @@ import { cn } from '@/lib/cn'
  * easier to write and much harder to use.
  */
 
-type SheetKind = 'seal' | 'pay' | 'deliver' | 'negotiate' | 'explain' | null
+type SheetKind = 'seal' | 'pay' | 'deliver' | 'negotiate' | 'explain' | 'dispute' | null
 
 export default function PactPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -149,6 +150,18 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
     }
   }
 
+  const closeDispute = async (disputeId: string, status: 'RESOLVED' | 'WITHDRAWN') => {
+    setBusy(true)
+    try {
+      await api(`/api/disputes/${disputeId}`, { method: 'PATCH', body: { status } })
+      await load()
+    } catch (cause) {
+      setError(toUserFacing(cause))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const self = useMemo(
     () =>
       pact && me?.address
@@ -158,6 +171,9 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
   )
   const other = useMemo(() => pact?.participants.find((p) => p !== self), [pact, self])
   const openProposal = pact?.negotiations.find((n) => n.status === 'OPEN')
+  const openDispute = pact?.disputes.find((d) => d.status === 'OPEN')
+  const raisedByMe =
+    openDispute != null && normalizeAddress(openDispute.raisedBy) === normalizeAddress(me?.address ?? '')
   const pendingDelivery = pact?.deliverables.find((d) => d.status === 'SUBMITTED')
   const nextUnpaid = pact?.milestones.find((m) => m.status !== 'PAID' && m.status !== 'CANCELLED')
   const cannotPay = pact ? payabilityReason(pact) : null
@@ -278,6 +294,53 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
 
         {cannotPay && role === 'CLIENT' && <ErrorNotice error={cannotPay} className="mb-5" />}
         {error && <ErrorNotice error={error} className="mb-5" onRetry={() => void load()} />}
+
+        {/* --- open issue ---------------------------------------------------------- */}
+        {openDispute && (
+          <section id="dispute" className="mb-7 scroll-mt-6">
+            <SectionTitle>Open issue</SectionTitle>
+            <div className="surface border-rose/30 bg-rose/[0.05] px-4 py-4">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-rose" />
+                <div className="min-w-0">
+                  <p className="text-small font-medium text-chalk">
+                    {raisedByMe
+                      ? DISPUTE_REASON_META[openDispute.reason].label
+                      : DISPUTE_REASON_META[openDispute.reason].counterparty}
+                  </p>
+                  <p className="mt-1 text-[0.7rem] text-chalk-faint">
+                    Raised by {raisedByMe ? 'you' : other?.displayName ?? 'the other side'} ·{' '}
+                    {relativeTime(openDispute.createdAt)}
+                  </p>
+                </div>
+              </div>
+
+              <p className="mt-3.5 whitespace-pre-line text-small leading-relaxed text-chalk-muted">
+                {openDispute.detail}
+              </p>
+
+              <div className="mt-4 flex gap-2.5">
+                <Button fullWidth busy={busy} onClick={() => void closeDispute(openDispute.id, 'RESOLVED')}>
+                  Mark resolved
+                </Button>
+                {raisedByMe && (
+                  <Button
+                    variant="secondary"
+                    fullWidth
+                    disabled={busy}
+                    onClick={() => void closeDispute(openDispute.id, 'WITHDRAWN')}
+                  >
+                    Withdraw
+                  </Button>
+                )}
+              </div>
+              <p className="mt-2.5 text-[0.7rem] leading-relaxed text-chalk-faint">
+                Closing this puts the agreement back in progress. PACT doesn’t decide who’s right, and nothing here
+                moves or holds a payment.
+              </p>
+            </div>
+          </section>
+        )}
 
         {/* --- open proposal ------------------------------------------------------- */}
         {openProposal && (
@@ -575,7 +638,7 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
             </Button>
           )}
           {!['COMPLETED', 'CANCELLED', 'DECLINED', 'DISPUTED'].includes(pact.status) && (
-            <Button variant="ghost" fullWidth disabled={busy} onClick={() => void transition('DISPUTED')}>
+            <Button variant="ghost" fullWidth disabled={busy} onClick={() => setSheet('dispute')}>
               Raise an issue
             </Button>
           )}
@@ -624,6 +687,12 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
         onProposed={() => void load()}
       />
       <ExplainSheet open={sheet === 'explain'} onClose={() => setSheet(null)} pact={pact} />
+      <DisputeSheet
+        open={sheet === 'dispute'}
+        onClose={() => setSheet(null)}
+        pact={pact}
+        onRaised={() => void load()}
+      />
     </>
   )
 }
