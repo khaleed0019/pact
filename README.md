@@ -22,16 +22,28 @@ takes a fee, and does not exist inside the wallet where the money already is.
 
 ## What PACT does
 
-1. **Describe the deal in your own words.** PACT extracts the parties, deliverable,
+1. **Pick what kind of agreement it is.** Freelance work and money between people carry an
+   amount; a commitment or a challenge has no money in it at all, and the app drops every
+   payment field rather than showing you a zero. The category also decides what the two
+   sides are called — "Paying" and "Delivering" is wrong for two friends holding each
+   other to a running schedule.
+2. **Describe the deal in your own words.** PACT extracts the parties, deliverable,
    amount, currency, deadline, payment condition and milestones into a structured
    agreement you can edit.
-2. **Smart Review flags what could be read two ways** — "several videos", a missing
+3. **Smart Review flags what could be read two ways** — "several videos", a missing
    deadline, uncapped revisions — and proposes a concrete fix for each.
-3. **Both sides sign it with their Nimiq wallet.** Not a checkbox: a real Ed25519
+4. **Both sides sign it with their Nimiq wallet.** Not a checkbox: a real Ed25519
    signature over a fingerprint of the exact terms.
-4. **Pay from the agreement.** NIM payments carry the agreement reference on-chain in the
-   transaction's data field. USDT settles as an ERC-20 transfer on the chosen chain.
-5. **Everything lands on one shared timeline** that both parties see identically.
+5. **Pay from the agreement**, when there is money in it. NIM payments carry the agreement
+   reference on-chain in the transaction's data field. USDT settles as an ERC-20 transfer
+   on the chosen chain.
+6. **Raise an issue if it goes wrong.** Pick from the four things that actually go wrong,
+   say what happened in your own words, and the other side sees both. Either of you can
+   mark it resolved.
+7. **Everything lands on one shared timeline** that both parties see identically.
+8. **Publish the record, if you both want to.** A published agreement gets a link anyone
+   can open to check the terms, the fingerprint and both signatures — without seeing your
+   delivery notes, transaction references or full wallet addresses.
 
 ---
 
@@ -79,7 +91,18 @@ funds. **So PACT never claims to.**
 - The AI helps you word an agreement clearly. It is not legal advice, and every AI surface
   says so.
 - Trust metrics count only what can be evidenced, and always show the denominator: "4 of
-  5 delivered on time", never a bare 80%.
+  5 delivered on time", never a bare 80%. `/stats` applies the same rule to the whole
+  product, and every figure there is a `count(*)` over agreements that already exist —
+  PACT records no page views, no sessions, and nothing about what any individual did.
+- Raising an issue records a disagreement. It does not adjudicate one, and it moves no
+  money: there is no "upheld" or "rejected", because neither is something this app could
+  honestly decide.
+- A published record proves that specific terms produced a specific fingerprint and that
+  two keys signed it. It does not prove the work was any good or that money arrived, and
+  the page says exactly that rather than implying otherwise.
+- Every pact is private until a participant publishes it, and either of them can undo
+  that. "Anyone with the link can check this" and "list this publicly" are separate
+  choices — a shareable pact never appears in the public directory.
 
 This is enforced, not just intended. `npm run check:honesty` fails the build if the words
 *escrow*, *funds are held*, *release the funds*, *guarantee payment*, *refund* or *legally
@@ -159,14 +182,21 @@ app/                Next.js 15 App Router
   p/[id]            One agreement
   new               The AI Pact Builder
   i/[token]         Invitation landing (readable before you connect a wallet)
+  pacts             Every agreement you're part of
+  activity          Notifications
   trust             Trust profile
+  verify/[shortId]  Public record — no session, no wallet, no membership
+  discover          Agreements their parties chose to list publicly
+  stats             Product-wide usage, counted from rows that already exist
 components/
   seal/             The PACT Seal
-  pact/             Timeline, payment, sealing, delivery, negotiation sheets
+  pact/             Timeline, payment, sealing, delivery, negotiation, dispute sheets
+  nav/              Bottom tab bar
   ui/               Design system primitives
 lib/
   nimiq/            The only place the wallet providers are touched
-  pact/             Pure domain logic — state machine, digest, money
+  pact/             Pure domain logic — state machine, digest, money, categories,
+                    and verification.ts, the single redaction boundary
   ai/               Model calls (Gemini or Anthropic) + deterministic fallback
   db/               Repository interface, in-process store, Postgres adapter, demo seed
 supabase/migrations Complete Postgres schema
@@ -192,6 +222,17 @@ supabase/migrations Complete Postgres schema
 - No secrets reach the browser. `lib/ai/providers.ts`, `lib/db/*` and `lib/auth/session.ts`
   are all `server-only`, so an accidental client import is a build error rather than a
   leaked key.
+- **The public record has one redaction boundary, in one file.** Everything a
+  non-participant can see goes through `toVerificationRecord()` in
+  `lib/pact/verification.ts`, which builds a separate `VerificationRecord` type field by
+  field rather than spreading a pact — so a column added later cannot publish itself. A
+  test serialises the whole payload and greps it for wallet addresses.
+- **Visibility checks are allowlists, not denylists.** `=== 'SHAREABLE' || === 'PUBLIC'`
+  rather than `!== 'PRIVATE'`, so a row from before that column existed, or one written by
+  a newer deploy, withholds instead of publishing. This was a real bug caught in testing,
+  and it is now pinned by a test over `null`, `undefined`, `''` and unknown strings.
+- A private agreement and a reference that was never issued are indistinguishable from
+  outside: both return a plain 404, with no wording or timing difference to probe.
 
 ### Persistence
 
@@ -202,8 +243,9 @@ Two interchangeable stores behind one interface:
   in a banner rather than letting you find out later.
 - **Supabase Postgres** when `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set.
 
-The schema is in [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql):
-12 tables plus a derived `trust_metrics` view, RLS enabled on every table with **no
+The schema is in [`supabase/migrations/`](supabase/migrations/) — `0001_init.sql` plus
+migrations for the trigger `search_path`, disputes, visibility and categories:
+13 tables plus a derived `trust_metrics` view, RLS enabled on every table with **no
 policies at all** (Postgres denies by default, and authorisation lives in the server
 routes rather than in RLS), and indexes on every foreign key.
 
@@ -236,7 +278,7 @@ is worse than no number at all.
 npm run verify     # typecheck + honesty check + tests
 ```
 
-55 tests, no test framework dependency — Node runs the TypeScript directly.
+83 tests, no test framework dependency — Node runs the TypeScript directly.
 
 The ones worth knowing about:
 
@@ -252,6 +294,14 @@ The ones worth knowing about:
 - **The state machine** refuses to let a provider approve their own delivery, or anyone
   skip the lifecycle.
 - **Attention detection** only surfaces things the viewer can actually act on.
+- **The public record withholds what it should.** The whole serialised payload is checked
+  for full wallet addresses, and an unrecognised visibility must withhold rather than
+  publish. A shareable pact stays out of the public directory while remaining checkable
+  by reference — two different consents, kept apart.
+- **One open issue per agreement**, decided in storage so two simultaneous taps cannot
+  both win, and only the person who raised one can withdraw it.
+- **An unrecognised category renders rather than crashing** — it used to throw and take
+  down the whole list screen, which is the screen that touches every pact at once.
 
 ---
 
