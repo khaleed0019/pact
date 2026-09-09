@@ -438,10 +438,14 @@ export class SupabaseRepository implements Repository {
   }
 
   async listPactsForAddress(address: string): Promise<Pact[]> {
-    const { data: memberships } = await this.db
+    const { data: memberships, error: membershipsError } = await this.db
       .from('pact_participants')
       .select('pact_id')
       .eq('address', normalizeAddress(address))
+    // A real failure here (bad credentials, no route to Postgres, schema not exposed)
+    // must not read as "this address has no agreements" — those look identical once
+    // `data` is null, and only one of them is actually true.
+    if (membershipsError) fail(membershipsError, 'Could not load your agreements.')
 
     const ids = ((memberships ?? []) as Row[]).map((row) => str(row.pact_id))
     if (ids.length === 0) return []
@@ -451,6 +455,9 @@ export class SupabaseRepository implements Repository {
       this.db.from('pact_participants').select(PARTICIPANT_COLUMNS).in('pact_id', ids),
       this.db.from('milestones').select(MILESTONE_COLUMNS).in('pact_id', ids).order('position'),
     ])
+    if (pacts.error) fail(pacts.error, 'Could not load your agreements.')
+    if (participants.error) fail(participants.error, 'Could not load your agreements.')
+    if (milestones.error) fail(milestones.error, 'Could not load your agreements.')
 
     const participantsByPact = new Map<string, Participant[]>()
     for (const row of (participants.data ?? []) as Row[]) {
@@ -942,6 +949,11 @@ export class SupabaseRepository implements Repository {
         .or(`from_address.eq.${wanted},to_address.eq.${wanted}`),
       this.db.from('pact_participants').select('pact_id, role, display_name').eq('address', wanted),
     ])
+    // Same failure mode as listPactsForAddress: a connection or permission error here
+    // would otherwise render as "0 of everything" rather than the outage it actually is.
+    if (summary.error) fail(summary.error, 'Could not load your trust profile.')
+    if (payments.error) fail(payments.error, 'Could not load your trust profile.')
+    if (memberships.error) fail(memberships.error, 'Could not load your trust profile.')
 
     const metrics: TrustMetrics = {
       address: wanted,
