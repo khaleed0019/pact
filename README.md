@@ -41,9 +41,16 @@ takes a fee, and does not exist inside the wallet where the money already is.
    say what happened in your own words, and the other side sees both. Either of you can
    mark it resolved.
 7. **Everything lands on one shared timeline** that both parties see identically.
-8. **Publish the record, if you both want to.** A published agreement gets a link anyone
-   can open to check the terms, the fingerprint and both signatures — without seeing your
-   delivery notes, transaction references or full wallet addresses.
+8. **Renegotiate a live agreement.** Either side can propose changes to a sealed pact.
+   Accepting applies them, which moves the fingerprint and clears both signatures — so
+   the agreement cannot go back to sealed until both people have signed what it now says.
+9. **See when terms moved after signing.** If the fingerprint no longer matches the one
+   both parties signed, the agreement says so outright and shows both values, rather than
+   letting the signatures quietly vanish.
+10. **Publish the record, if you both want to.** A published agreement gets a link anyone
+    can open to check the terms, the fingerprint and both signatures — without seeing your
+    delivery notes, transaction references or full wallet addresses. Anyone can also look
+    up a reference directly.
 
 ---
 
@@ -278,7 +285,7 @@ is worse than no number at all.
 npm run verify     # typecheck + honesty check + tests
 ```
 
-83 tests, no test framework dependency — Node runs the TypeScript directly.
+86 tests, no test framework dependency — Node runs the TypeScript directly.
 
 The ones worth knowing about:
 
@@ -302,6 +309,10 @@ The ones worth knowing about:
   both win, and only the person who raised one can withdraw it.
 - **An unrecognised category renders rather than crashing** — it used to throw and take
   down the whole list screen, which is the screen that touches every pact at once.
+- **A sealed agreement can be renegotiated and must be re-signed.** Applying an accepted
+  change moves the digest and clears both signatures, and the test walks the whole loop.
+- **Change detection only fires after both signed** — a digest moving mid-negotiation is
+  ordinary, and flagging it would cry wolf on the normal path.
 
 ---
 
