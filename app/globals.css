@@ -334,6 +334,24 @@
   border-color: rgb(247 201 72 / 0.35);
 }
 
+/*
+ * Route transitions. Opacity only — see app/template.tsx for why a transform here would
+ * break every position: fixed element in the app.
+ */
+.page-enter {
+  animation: page-fade 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity;
+}
+
+@keyframes page-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @keyframes seal-ring {
   from {
     scale: 0.72;
