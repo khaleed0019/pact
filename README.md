@@ -10,6 +10,18 @@ Built for the [Nimiq Mini Apps Competition, Cycle II](https://miniappscompetitio
 
 ---
 
+<p align="center">
+  <img src="public/brand/shots/terms-changed.png" alt="A PACT whose terms moved after both parties signed: the signed fingerprint struck through, the current one below it, and both signatures cleared." width="320">
+</p>
+
+<p align="center">
+  <em>Edit a term after both people signed, and the agreement says so — showing the
+  fingerprint that was signed against the one it reads now. The signatures clear
+  themselves, because a signature only ever matches the exact terms it was made over.</em>
+</p>
+
+---
+
 ## The problem
 
 Freelancers, clients, creators and small sellers make informal deals constantly, and then
