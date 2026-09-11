@@ -7,6 +7,7 @@ import { ArrowLeft, ShieldOff } from 'lucide-react'
 import { api, toUserFacing } from '@/lib/client/api'
 import { formatAmount } from '@/lib/pact/money'
 import { ErrorNotice, SectionTitle, Skeleton } from '@/components/ui/Bits'
+import { useCountUp } from '@/lib/client/useCountUp'
 import type { Currency, ProductStats } from '@/lib/pact/types'
 import type { UserFacingError } from '@/lib/errors'
 
@@ -131,10 +132,12 @@ export default function StatsPage() {
 }
 
 function Stat({ label, value, sub }: { label: string; value: number; sub: string }) {
+  // Counts up to the real figure on arrival. The number is never inflated — see useCountUp.
+  const shown = useCountUp(value)
   return (
     <div className="surface px-4 py-3.5">
       <p className="text-micro uppercase tracking-wider text-chalk-faint">{label}</p>
-      <p className="tabular mt-1.5 text-title text-chalk">{value}</p>
+      <p className="tabular mt-1.5 text-title text-chalk">{shown}</p>
       <p className="mt-0.5 text-[0.7rem] text-chalk-faint">{sub}</p>
     </div>
   )

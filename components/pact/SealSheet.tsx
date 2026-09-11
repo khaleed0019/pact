@@ -104,7 +104,11 @@ export function SealSheet({
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         >
-          <PactSeal status={bothSigned ? 'ACTIVE' : 'PENDING'} digest={pact.termsDigest} size="lg" animate />
+          {/* The burst only fires when the agreement actually locks. One side signing is
+              progress; both signing is the event, and only the event gets celebrated. */}
+          <div className={bothSigned ? 'seal-burst' : undefined}>
+            <PactSeal status={bothSigned ? 'ACTIVE' : 'PENDING'} digest={pact.termsDigest} size="lg" animate />
+          </div>
           <h3 className="mt-6 text-title text-chalk">
             {bothSigned ? 'Both sides have signed.' : 'Your signature is recorded.'}
           </h3>

@@ -856,7 +856,7 @@ function DigestRow({
       <p
         className={cn(
           'tabular mt-1 break-all text-[0.7rem] leading-relaxed',
-          struck ? 'text-chalk-faint line-through decoration-rose/60' : 'text-chalk',
+          struck ? 'strike-through-draw text-chalk-faint' : 'digest-arrive text-chalk',
         )}
       >
         {digest.replace(/(.{4})/g, '$1 ').trim().toUpperCase()}
