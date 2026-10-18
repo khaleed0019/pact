@@ -181,11 +181,29 @@ test('the brand is told, and the pact points back at its campaign', async () => 
   const { make, claim, repo, store } = setup()
   const c = await make()
   const { pact } = await claim(c.id, ALICE, 'Alice')
+  assert.equal((await overviewOf(repo, store, c)).claims[0].pendingDelivery, null)
 
   const nudges = await repo.refreshNotifications(BRAND)
   const waiting = nudges.find((n) => n.pactId === pact.id && n.kind === 'ACCEPTANCE_PENDING')
   assert.ok(waiting, 'someone taking the campaign up reaches the brand as a signature request')
+  assert.match(waiting.body, /Alice/, 'and it says who')
   assert.equal((await repo.refreshNotifications(ALICE)).some((n) => n.pactId === pact.id && n.kind === 'ACCEPTANCE_PENDING'), false, 'not the person who made it')
 
   assert.equal((await store.getClaimByPact(pact.id))?.campaignId, c.id)
+})
+
+test('submitted work shows up for the brand to review from the campaign', async () => {
+  const { make, claim, repo, store } = setup()
+  const c = await make()
+  const { pact } = await claim(c.id, ALICE, 'Alice')
+  await repo.recordSeal({ pactId: pact.id, address: ALICE, signature: 'a'.repeat(128), publicKey: 'b'.repeat(64) })
+  await repo.recordSeal({ pactId: pact.id, address: BRAND, signature: 'c'.repeat(128), publicKey: 'd'.repeat(64) })
+  await repo.submitDeliverable({ pactId: pact.id, milestoneId: null, submittedBy: ALICE, note: 'Here it is', link: 'https://example.com/x' })
+
+  const row = (await overviewOf(repo, store, c)).claims[0]
+  assert.equal(row.awaitingReview, true)
+  assert.equal(row.pendingDelivery?.note, 'Here it is')
+
+  await repo.reviewDeliverable({ deliverableId: row.pendingDelivery!.id, actor: BRAND, status: 'APPROVED', reviewNote: null })
+  assert.equal((await overviewOf(repo, store, c)).claims[0].pendingDelivery, null)
 })

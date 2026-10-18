@@ -86,6 +86,8 @@ export interface ClaimOverview {
   awaitingBrandSignature: boolean
   /** Work submitted and not yet reviewed. */
   awaitingReview: boolean
+  /** The delivery waiting on the brand, so it can be reviewed from the campaign page. */
+  pendingDelivery: { id: string; note: string; link: string | null } | null
   paidMinor: string
   paymentSubmitted: boolean
 }
@@ -94,6 +96,11 @@ export interface CampaignOverview {
   campaign: Campaign
   budget: BudgetSummary
   claims: ClaimOverview[]
+}
+
+function pendingOf(pact: PactDetail | null): ClaimOverview['pendingDelivery'] {
+  const d = pact?.deliverables.find((x) => x.status === 'SUBMITTED')
+  return d ? { id: d.id, note: d.note, link: d.link } : null
 }
 
 /** The brand's view: who took it up, where each agreement stands, and what has really been paid. */
@@ -120,6 +127,7 @@ export async function overviewOf(repo: Repository, store: CampaignStore, campaig
       sealed,
       awaitingBrandSignature: !!pact && !!brand && !brand.sealSignature && !!provider?.sealSignature,
       awaitingReview: !!pact?.deliverables.some((d) => d.status === 'SUBMITTED'),
+      pendingDelivery: pendingOf(pact),
       paidMinor: confirmed.reduce((sum, p) => sum + BigInt(p.amountMinor), 0n).toString(),
       paymentSubmitted: !!pact?.payments.some((p) => p.status === 'SUBMITTED'),
     })

@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/Button'
 import { EmptyState, ErrorNotice, SectionTitle, Skeleton, StatusPill } from '@/components/ui/Bits'
 import { cn } from '@/lib/cn'
 import type { BudgetSummary, Campaign } from '@/lib/campaigns/model'
-import type { PactStatus } from '@/lib/pact/types'
+import type { Currency, PactStatus } from '@/lib/pact/types'
+import { TextInput } from '@/components/ui/Field'
 import type { UserFacingError } from '@/lib/errors'
 
 interface Card {
@@ -49,7 +50,19 @@ export default function CampaignsPage() {
     void load()
   }, [load, me?.address])
 
-  const others = data?.open.filter((c) => !data.mine.some((m) => m.campaign.id === c.campaign.id)) ?? []
+  const [query, setQuery] = useState('')
+  const [currency, setCurrency] = useState<'ALL' | Currency>('ALL')
+  const [hideFull, setHideFull] = useState(true)
+
+  const offered = data?.open.filter((c) => !data.mine.some((m) => m.campaign.id === c.campaign.id)) ?? []
+  const needle = query.trim().toLowerCase()
+  const others = offered.filter(
+    (c) =>
+      (currency === 'ALL' || c.campaign.currency === currency) &&
+      (!hideFull || c.budget.open > 0) &&
+      (needle === '' || `${c.campaign.title} ${c.campaign.ownerName} ${c.campaign.brief}`.toLowerCase().includes(needle)),
+  )
+  const filtering = needle !== '' || currency !== 'ALL' || !hideFull
 
   return (
     <main className={cn('mx-auto w-full max-w-[34rem] px-5', TAB_BAR_SPACER)}>
@@ -115,7 +128,51 @@ export default function CampaignsPage() {
       {data && (
         <section>
           <SectionTitle>Open now</SectionTitle>
-          {others.length === 0 ? (
+          {offered.length > 0 && (
+            <div className="mb-3 space-y-2.5">
+              <TextInput
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search work or brands"
+                aria-label="Search campaigns"
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                {(['ALL', 'NIM', 'USDT'] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-pressed={currency === option}
+                    onClick={() => setCurrency(option)}
+                    className={cn(
+                      'min-h-9 rounded-full border px-3.5 text-small transition-colors',
+                      currency === option
+                        ? 'border-gold/45 bg-gold/12 text-chalk'
+                        : 'border-white/[0.08] text-chalk-muted active:bg-white/[0.06]',
+                    )}
+                  >
+                    {option === 'ALL' ? 'Any currency' : option}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  aria-pressed={hideFull}
+                  onClick={() => setHideFull((v) => !v)}
+                  className={cn(
+                    'min-h-9 rounded-full border px-3.5 text-small transition-colors',
+                    hideFull ? 'border-gold/45 bg-gold/12 text-chalk' : 'border-white/[0.08] text-chalk-muted',
+                  )}
+                >
+                  Hide full
+                </button>
+              </div>
+            </div>
+          )}
+          {others.length === 0 && offered.length > 0 && filtering ? (
+            <p className="surface px-4 py-6 text-center text-small text-chalk-muted">
+              Nothing matches. Try a different search or turn a filter off.
+            </p>
+          ) : others.length === 0 ? (
             <div className="surface">
               <EmptyState
                 icon={<Megaphone className="h-8 w-8" />}

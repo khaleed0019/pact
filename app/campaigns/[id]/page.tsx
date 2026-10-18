@@ -188,19 +188,7 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
                 ) : (
                   <ul className="space-y-2.5">
                     {detail.claims.map((c) => (
-                      <li key={c.claim.id}>
-                        <Link
-                          href={c.pactId ? `/p/${c.pactId}` : '#'}
-                          className="surface flex items-center gap-3 px-4 py-3.5 active:bg-white/[0.05]"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-body font-semibold text-chalk">{c.jobberName}</p>
-                            <p className="mt-0.5 text-[0.7rem] text-chalk-muted">{nextStep(c)}</p>
-                          </div>
-                          {c.pactStatus && <StatusPill status={c.pactStatus} />}
-                          <ChevronRight aria-hidden className="h-4 w-4 shrink-0 text-chalk-faint" />
-                        </Link>
-                      </li>
+                      <PersonRow key={c.claim.id} claim={c} onChanged={() => void load()} />
                     ))}
                   </ul>
                 )}
@@ -230,6 +218,101 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
         </div>
       )}
     </main>
+  )
+}
+
+/**
+ * One person's agreement, as the brand sees it. When they have submitted work it can be
+ * reviewed right here, through the same endpoint the pact page uses — approving or asking
+ * for changes is the pact's own action, not a second implementation of it.
+ */
+function PersonRow({ claim: c, onChanged }: { claim: ClaimOverview; onChanged: () => void }) {
+  const [asking, setAsking] = useState(false)
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<UserFacingError | null>(null)
+
+  const review = async (status: 'APPROVED' | 'CHANGES_REQUESTED') => {
+    if (!c.pendingDelivery) return
+    setBusy(true)
+    setError(null)
+    try {
+      await api(`/api/deliverables/${c.pendingDelivery.id}`, {
+        method: 'PATCH',
+        body: { status, reviewNote: status === 'CHANGES_REQUESTED' ? note.trim() || null : null },
+      })
+      setAsking(false)
+      setNote('')
+      onChanged()
+    } catch (cause) {
+      setError(toUserFacing(cause))
+    }
+    setBusy(false)
+  }
+
+  return (
+    <li className="surface overflow-hidden">
+      <Link href={c.pactId ? `/p/${c.pactId}` : '#'} className="flex items-center gap-3 px-4 py-3.5 active:bg-white/[0.05]">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-body font-semibold text-chalk">{c.jobberName}</p>
+          <p className="mt-0.5 text-[0.7rem] text-chalk-muted">{nextStep(c)}</p>
+        </div>
+        {c.pactStatus && <StatusPill status={c.pactStatus} />}
+        <ChevronRight aria-hidden className="h-4 w-4 shrink-0 text-chalk-faint" />
+      </Link>
+
+      {c.pendingDelivery && (
+        <div className="space-y-3 border-t border-white/[0.06] px-4 py-3">
+          <p className="whitespace-pre-line text-small text-chalk">{c.pendingDelivery.note}</p>
+          {c.pendingDelivery.link && (
+            <a
+              href={c.pendingDelivery.link}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="block break-all text-small font-medium text-azure-bright underline underline-offset-4"
+            >
+              {c.pendingDelivery.link}
+            </a>
+          )}
+          {asking && (
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              maxLength={500}
+              placeholder="What needs to change?"
+              aria-label="What needs to change"
+              className="w-full resize-none rounded-xl border border-white/[0.09] bg-black/25 px-3.5 py-2.5 text-small text-chalk placeholder:text-chalk-faint focus:border-gold/50 focus:outline-none"
+            />
+          )}
+          {error && <ErrorNotice error={error} />}
+          <div className="flex gap-2">
+            {asking ? (
+              <>
+                <Button size="sm" busy={busy} onClick={() => void review('CHANGES_REQUESTED')}>
+                  Send back
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setAsking(false)}>
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button size="sm" busy={busy} onClick={() => void review('APPROVED')}>
+                  Approve
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => setAsking(true)}>
+                  Request changes
+                </Button>
+              </>
+            )}
+          </div>
+          <p className="text-[0.65rem] leading-relaxed text-chalk-faint">
+            Approving doesn’t pay. You pay from their agreement once you’re happy.
+          </p>
+        </div>
+      )}
+    </li>
   )
 }
 

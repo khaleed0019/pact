@@ -1247,7 +1247,7 @@ export class SupabaseRepository implements Repository {
       if (!self || isTerminal(pact.status)) continue
 
       if (pact.status === 'PENDING' && normalizeAddress(pact.createdBy) !== wanted) {
-        add(pact.id, 'ACCEPTANCE_PENDING', 'Waiting on you', `${pact.title} needs your signature.`)
+        add(pact.id, 'ACCEPTANCE_PENDING', 'Waiting on you', `${pact.participants.find((p) => p.address && normalizeAddress(p.address) === normalizeAddress(pact.createdBy))?.displayName ?? 'Someone'} sent you ${pact.title} to sign.`)
       }
       if (pact.deadline) {
         const due = new Date(pact.deadline)

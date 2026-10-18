@@ -957,7 +957,7 @@ export class MemoryRepository implements Repository {
       if (!self || isTerminal(pact.status)) continue
 
       if (pact.status === 'PENDING' && pact.createdBy !== wanted) {
-        add(pact.id, 'ACCEPTANCE_PENDING', 'Waiting on you', `${pact.title} needs your signature.`)
+        add(pact.id, 'ACCEPTANCE_PENDING', 'Waiting on you', `${participants.find((p) => p.address && normalizeAddress(p.address) === normalizeAddress(pact.createdBy))?.displayName ?? 'Someone'} sent you ${pact.title} to sign.`)
       }
       if (pact.status === 'NEGOTIATING') {
         const open = (this.t.negotiations.get(pact.id) ?? []).find(

@@ -12,6 +12,7 @@ Built for the [Nimiq Mini Apps Competition, Cycle II](https://miniappscompetitio
 
 <p align="center">
   <img src="public/brand/shots/terms-changed.png" alt="A PACT whose terms moved after both parties signed: the signed fingerprint struck through, the current one below it, and both signatures cleared." width="320">
+  <img src="public/brand/shots/earn.jpg" alt="The Earn tab: work a brand has posted, each with a fixed reward in NIM or USDT and how many spots are left." width="320">
 </p>
 
 <p align="center">
