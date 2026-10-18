@@ -22,21 +22,35 @@ import { cn } from '@/lib/cn'
  * explicit rather than a boolean `loading`:
  *
  *   idle → recording → awaiting-wallet → submitted → confirmed
+ *                            │              └→ unconfirmed (sent, not yet visible on the network)
  *                            ├→ cancelled  (the user said no; not a failure)
  *                            └→ failed     (something actually went wrong)
  *
- * Two rules the code enforces rather than merely intends:
+ * Rules the code enforces rather than merely intends:
  *
  *  1. The PENDING record is written **before** the wallet opens. If the app dies between
  *     the dialog and the response, the attempt still exists and is visible.
- *  2. Nothing is called confirmed without a transaction reference from the wallet. For
- *     USDT that is the tx hash; for NIM it is the serialized transaction the provider
- *     returns. `submitted` and `confirmed` are worded differently in the UI on purpose —
- *     "sent" is not "settled", and telling a user otherwise is the one unforgivable bug
- *     in a payments app.
+ *  2. This component never confirms anything. The wallet handing back a reference means
+ *     "sent"; `confirmed` is shown only when the server has read the network and found a
+ *     payment of the agreed amount to the agreed recipient.
+ *  3. Once the wallet has returned a reference, no problem of ours marks the payment
+ *     failed. Money may have left; only the chain can say it did not.
  */
 
-type Phase = 'idle' | 'recording' | 'awaiting-wallet' | 'submitted' | 'confirmed' | 'cancelled' | 'failed'
+type Phase =
+  | 'idle'
+  | 'recording'
+  | 'awaiting-wallet'
+  | 'submitted'
+  | 'unconfirmed'
+  | 'confirmed'
+  | 'cancelled'
+  | 'failed'
+
+interface Verification {
+  state: string
+  reason?: string
+}
 
 interface Instruction {
   recipient: string
@@ -67,6 +81,7 @@ export function PaymentSheet({
   const [error, setError] = useState<UserFacingError | null>(null)
   const [payment, setPayment] = useState<Payment | null>(null)
   const [reference, setReference] = useState<string | null>(null)
+  const [note, setNote] = useState<string | null>(null)
 
   /**
    * Stable per-attempt key. Generated once when the sheet opens so that a double tap on
@@ -81,6 +96,7 @@ export function PaymentSheet({
       setError(null)
       setPayment(null)
       setReference(null)
+      setNote(null)
     }
   }, [open, pact.id, milestone?.id])
 
@@ -121,8 +137,8 @@ export function PaymentSheet({
 
     setPhase('awaiting-wallet')
 
+    let txReference: string
     try {
-      let txReference: string
 
       if (created.instruction.currency === 'NIM') {
         txReference = await sendNimWithMemo({
@@ -145,26 +161,12 @@ export function PaymentSheet({
         })
       }
 
-      setReference(txReference)
-      setPhase('submitted')
-
-      /*
-       * The wallet returned a reference, so the transaction left the device. We mark it
-       * SUBMITTED first — that is a fact — and only then CONFIRMED. PACT does not run its
-       * own chain indexer, so "confirmed" here means the wallet accepted and broadcast
-       * the transaction, and the reference is stored so anyone can check it themselves.
-       */
-      await settle(created.payment.id, 'SUBMITTED', { txReference })
-      await settle(created.payment.id, 'CONFIRMED', { txReference })
-
-      setPhase('confirmed')
-      onSettled()
     } catch (cause) {
       const userFacing = toUserFacing(cause)
       const cancelled = userFacing.code === 'USER_REJECTED'
 
-      // Record the outcome against the payment we already created, so a cancelled or
-      // failed attempt is visible on the timeline rather than disappearing.
+      // Nothing left the wallet. Record that against the payment we already created, so a
+      // cancelled or failed attempt is visible on the timeline rather than disappearing.
       try {
         await settle(created.payment.id, cancelled ? 'CANCELLED' : 'FAILED', { failureReason: userFacing.title })
       } catch {
@@ -174,6 +176,83 @@ export function PaymentSheet({
       setPhase(cancelled ? 'cancelled' : 'failed')
       setError(userFacing)
       onSettled()
+      return
+    }
+
+    /*
+     * The wallet returned a reference, so the transaction may have left the device. From
+     * here on this attempt is never marked FAILED because *we* hit a problem — only the
+     * chain can say a payment did not happen. The payer's report is SUBMITTED; whether it
+     * is CONFIRMED is decided by the server reading the network.
+     */
+    setReference(txReference)
+    setPhase('submitted')
+    try {
+      const result = await api<{ payment: Payment; verification: Verification | null }>(
+        `/api/payments/${created.payment.id}`,
+        { method: 'PATCH', body: { status: 'SUBMITTED', txReference, failureReason: null } },
+      )
+      await resolve(created.payment.id, result)
+    } catch (cause) {
+      setPhase('unconfirmed')
+      setNote('Your payment was sent, but PACT could not record it just now. Check again in a moment.')
+      void cause
+      onSettled()
+    }
+  }
+
+  /** Poll the server's own chain check until it settles or we run out of patience. */
+  const resolve = async (
+    paymentId: string,
+    first: { payment: Payment; verification: Verification | null },
+  ) => {
+    let latest = first
+    for (let attempt = 0; attempt < 12; attempt++) {
+      if (latest.payment.status === 'CONFIRMED') break
+      if (latest.payment.status === 'FAILED') break
+      await new Promise((r) => setTimeout(r, 3000))
+      try {
+        latest = await api(`/api/payments/${paymentId}/verify`, { method: 'POST' })
+      } catch {
+        // A failed check says nothing about the payment. Keep waiting.
+      }
+    }
+
+    setPayment(latest.payment)
+    if (latest.payment.txReference) setReference(latest.payment.txReference)
+
+    if (latest.payment.status === 'CONFIRMED') {
+      setPhase('confirmed')
+    } else if (latest.payment.status === 'FAILED') {
+      setPhase('failed')
+      setError({
+        ...describe('UNKNOWN'),
+        title: 'This payment didn’t match the agreement',
+        body: latest.payment.failureReason ?? 'The transaction on the network does not match what was agreed.',
+      })
+    } else {
+      setPhase('unconfirmed')
+      setNote(
+        latest.verification?.reason ??
+          'Your payment was sent and is waiting to be confirmed on the network. This can take a minute.',
+      )
+    }
+    onSettled()
+  }
+
+  const checkAgain = async () => {
+    if (!payment) return
+    setPhase('submitted')
+    setNote(null)
+    try {
+      const result = await api<{ payment: Payment; verification: Verification | null }>(
+        `/api/payments/${payment.id}/verify`,
+        { method: 'POST' },
+      )
+      await resolve(payment.id, result)
+    } catch {
+      setPhase('unconfirmed')
+      setNote('Couldn’t reach the network just now. Your payment isn’t lost — try again in a moment.')
     }
   }
 
@@ -185,7 +264,7 @@ export function PaymentSheet({
       open={open}
       onClose={onClose}
       dismissible={!busy}
-      title={done ? 'Payment sent' : milestone ? `Pay ${milestone.title}` : 'Pay this agreement'}
+      title={done ? 'Payment confirmed' : milestone ? `Pay ${milestone.title}` : 'Pay this agreement'}
       description={done ? undefined : `To ${pact.participants.find((p) => p.role === 'PROVIDER')?.displayName ?? 'the provider'}`}
       footer={
         done ? (
@@ -194,8 +273,10 @@ export function PaymentSheet({
           </Button>
         ) : (
           <div className="space-y-2">
-            <Button size="lg" fullWidth busy={busy} onClick={() => void pay()}>
-              {phase === 'awaiting-wallet' ? (
+            <Button size="lg" fullWidth busy={busy} onClick={() => void (phase === 'unconfirmed' ? checkAgain() : pay())}>
+              {phase === 'unconfirmed' ? (
+                'Check again'
+              ) : phase === 'awaiting-wallet' ? (
                 'Confirm in your wallet'
               ) : phase === 'cancelled' || phase === 'failed' ? (
                 'Try again'
@@ -227,7 +308,7 @@ export function PaymentSheet({
           </div>
           <Money minor={amountMinor} currency={pact.currency} size="xl" className="mt-5 text-chalk" />
           <p className="mt-2 text-small text-chalk-muted">
-            Sent to {pact.participants.find((p) => p.role === 'PROVIDER')?.displayName ?? 'the provider'}
+            Confirmed on the network. Paid to {pact.participants.find((p) => p.role === 'PROVIDER')?.displayName ?? 'the provider'}
             {milestone ? ` for ${milestone.title}` : ''}.
           </p>
 
@@ -303,7 +384,15 @@ export function PaymentSheet({
           {phase === 'submitted' && (
             <div className="flex items-center gap-2.5 rounded-xl border border-azure/25 bg-azure/[0.07] px-3.5 py-3">
               <ArrowRight aria-hidden className="h-4 w-4 shrink-0 text-azure-bright" />
-              <p className="text-small text-chalk">Sent. Recording it against this agreement…</p>
+              <p className="text-small text-chalk">Sent. Checking the network for it…</p>
+            </div>
+          )}
+
+          {phase === 'unconfirmed' && (
+            <div className="space-y-2 rounded-xl border border-gold/25 bg-gold/[0.07] px-3.5 py-3">
+              <p className="text-small text-chalk">Sent — not confirmed yet</p>
+              {note && <p className="text-[0.75rem] leading-relaxed text-chalk-muted">{note}</p>}
+              {reference && <p className="break-all font-mono text-[0.65rem] text-chalk-faint">{reference}</p>}
             </div>
           )}
 

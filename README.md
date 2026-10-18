@@ -284,6 +284,20 @@ constraint settled_payments_have_a_reference check (
 constraint one_nudge_per_reason unique (address, pact_id, kind)
 ```
 
+### How a payment becomes "confirmed"
+
+A client cannot confirm a payment, and neither can the app on its behalf. The payer's
+wallet returns a transaction reference, which is recorded as **sent**. PACT's server
+then reads the network itself (`lib/nimiq/verifyPayment.ts`) and confirms only if the
+transaction exists, succeeded, went to the agreed recipient, for the agreed amount, with
+this agreement's memo (NIM) or on the real USDT contract (USDT), and is buried deep
+enough. If the network is unreachable the payment simply stays *sent*; it is never
+failed by an outage. One on-chain transaction can settle only one payment (a unique index,
+`0006`), and a confirmed payment can never change again.
+
+Not covered: this has been run against recorded real mainnet responses and a fake chain,
+not against a live PACT payment, and PACT never holds funds. Money moves wallet to wallet.
+
 `trust_metrics` is deliberately a **view**, not a table. Reputation has to be a function
 of what actually happened; a table would be a second copy of the truth that can drift from
 the rows it summarises, and a reputation number that disagrees with the history behind it

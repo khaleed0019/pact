@@ -3,6 +3,7 @@ import { canTransition, isTerminal, type Actor } from '../pact/state.ts'
 import { shortIdFromDigest, termsDigest, type CanonicalTerms } from '../pact/digest.ts'
 import { sumMinor } from '../pact/money.ts'
 import { toVerificationRecord } from '../pact/verification.ts'
+import { canPaymentTransition } from '../pact/paymentState.ts'
 import { normalizeAddress } from '../nimiq/address.ts'
 import type {
   Activity,
@@ -471,11 +472,34 @@ export class MemoryRepository implements Repository {
       const index = payments.findIndex((p) => p.id === input.paymentId)
       if (index === -1) continue
 
+      const current = payments[index]
+
+      // Re-applying the state a payment is already in is a harmless repeat (a retried
+      // request, a second tab) and changes nothing — in particular it must not be able to
+      // overwrite the reference of a payment that is already settled.
+      if (current.status === input.status) return current
+
+      if (!canPaymentTransition(current.status, input.status)) {
+        throw new RepoError('CONFLICT', `A payment that is ${current.status.toLowerCase()} cannot become ${input.status.toLowerCase()}.`)
+      }
+
+      // One on-chain transaction can settle at most one payment. Without this, a single
+      // real payment could be presented as the proof for any number of agreements.
+      if (
+        input.status === 'CONFIRMED' &&
+        input.txReference &&
+        [...this.t.payments.values()].some((list) =>
+          list.some((p) => p.id !== current.id && p.status === 'CONFIRMED' && p.txReference === input.txReference),
+        )
+      ) {
+        throw new RepoError('CONFLICT', 'That transaction has already settled a different payment.')
+      }
+
       const updated: Payment = {
-        ...payments[index],
+        ...current,
         status: input.status,
-        txReference: input.txReference ?? payments[index].txReference,
-        failureReason: input.failureReason ?? payments[index].failureReason,
+        txReference: input.txReference ?? current.txReference,
+        failureReason: input.failureReason ?? current.failureReason,
         updatedAt: now(),
       }
       const next = [...payments]

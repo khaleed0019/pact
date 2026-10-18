@@ -228,6 +228,17 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
     pact.milestones.length === 0 &&
     !pact.payments.some((p) => p.milestoneId === null && p.status === 'CONFIRMED')
 
+  const awaitingPayment = pact?.payments.find((p) => p.status === 'SUBMITTED') ?? null
+
+  const checkPayment = async (paymentId: string) => {
+    try {
+      await api(`/api/payments/${paymentId}/verify`, { method: 'POST' })
+    } catch {
+      // Not being able to check says nothing about the payment; it stays as it was.
+    }
+    await load()
+  }
+
   /** The single most useful thing this person can do right now. */
   const primary = useMemo(() => {
     if (!pact || !role) return null
@@ -249,6 +260,11 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
     }
     if ((pact.status === 'IN_PROGRESS' || pact.status === 'ACTIVE') && role === 'PROVIDER') {
       return { label: 'Submit a delivery', icon: Package, run: () => setSheet('deliver') }
+    }
+    if (awaitingPayment) {
+      // A payment that has left the wallet but is not on the network yet. Offering "Pay"
+      // again here is how someone pays twice, so the only action is to look again.
+      return { label: 'Check payment status', icon: Wallet, run: () => void checkPayment(awaitingPayment.id) }
     }
     if (role === 'CLIENT' && (nextUnpaid || owesFullPayment) && ['ACTIVE', 'IN_PROGRESS', 'DELIVERED'].includes(pact.status)) {
       return {

@@ -225,6 +225,7 @@ test('trust counts only confirmed payments and completed agreements', async () =
   let trust = await repo.getTrustMetrics(CLIENT)
   assert.equal(trust.paymentsConfirmed, 0, 'a pending payment counts for nothing')
 
+  await repo.updatePaymentStatus({ paymentId: payment.id, status: 'SUBMITTED', txReference: '0xabc' })
   await repo.updatePaymentStatus({ paymentId: payment.id, status: 'CONFIRMED', txReference: '0xabc' })
   trust = await repo.getTrustMetrics(CLIENT)
   assert.equal(trust.paymentsConfirmed, 1)

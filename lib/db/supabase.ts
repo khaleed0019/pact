@@ -4,6 +4,7 @@ import { canTransition, isTerminal, type Actor } from '../pact/state.ts'
 import { shortIdFromDigest, termsDigest, type CanonicalTerms } from '../pact/digest.ts'
 import { sumMinor } from '../pact/money.ts'
 import { toVerificationRecord } from '../pact/verification.ts'
+import { canPaymentTransition } from '../pact/paymentState.ts'
 import { normalizeAddress } from '../nimiq/address.ts'
 import type {
   Activity,
@@ -661,26 +662,43 @@ export class SupabaseRepository implements Repository {
     txReference?: string | null
     failureReason?: string | null
   }): Promise<Payment> {
+    const { data: found } = await this.db.from('payments').select(PAYMENT_COLUMNS).eq('id', input.paymentId).maybeSingle()
+    if (!found) throw new RepoError('NOT_FOUND', 'That payment does not exist.')
+    const current = toPayment(found as Row)
+
+    // Same rule as the in-process store: repeating the current state is a no-op, and
+    // nothing leaves a settled state.
+    if (current.status === input.status) return current
+    if (!canPaymentTransition(current.status, input.status)) {
+      throw new RepoError('CONFLICT', `A payment that is ${current.status.toLowerCase()} cannot become ${input.status.toLowerCase()}.`)
+    }
+
     const update: Row = { status: input.status }
     if (input.txReference !== undefined && input.txReference !== null) update.tx_reference = input.txReference
     if (input.failureReason !== undefined && input.failureReason !== null) update.failure_reason = input.failureReason
 
+    // Compare-and-set on the status we just read: if another request moved this payment
+    // in the meantime, this matches no row instead of overwriting their result.
     const { data, error } = await this.db
       .from('payments')
       .update(update)
       .eq('id', input.paymentId)
+      .eq('status', current.status)
       .select(PAYMENT_COLUMNS)
       .maybeSingle()
 
     if (error) {
-      // The database refuses SUBMITTED/CONFIRMED without a reference. Surface that as
-      // the rule it is rather than as a generic failure.
+      // The database refuses SUBMITTED/CONFIRMED without a reference, and (via a partial
+      // unique index) refuses a transaction that already settled another payment.
       if (error.code === '23514') {
         throw new RepoError('INVALID', 'A payment cannot be marked sent or confirmed without a transaction reference.')
       }
+      if (error.code === '23505') {
+        throw new RepoError('CONFLICT', 'That transaction has already settled a different payment.')
+      }
       fail(error, 'Could not update that payment.')
     }
-    if (!data) throw new RepoError('NOT_FOUND', 'That payment does not exist.')
+    if (!data) throw new RepoError('CONFLICT', 'That payment changed while you were updating it. Reload and check its status.')
     return toPayment(data as Row)
   }
 
