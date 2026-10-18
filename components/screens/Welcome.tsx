@@ -24,7 +24,7 @@ import { cn } from '@/lib/cn'
  */
 
 /**
- * Make it, agree to it, prove it — the three things PACT does, in the order they happen.
+ * Offer it, agree to it, get paid — the three things PACT does, in the order they happen.
  *
  * Deliberately one screen rather than three swipes. Both routes in have to be reachable
  * on first paint (see below), and putting two taps in front of "Explore demo" is exactly
@@ -33,8 +33,8 @@ import { cn } from '@/lib/cn'
 const MECHANICS = [
   {
     icon: PenLine,
-    title: 'Describe it, don’t draft it',
-    body: 'Say what you agreed in your own words. PACT turns it into clear terms you can edit.',
+    title: 'Post work, or describe a deal',
+    body: 'Brands post work with a fixed reward and people take it up. Or say what you agreed in your own words and PACT turns it into clear terms.',
   },
   {
     icon: ShieldCheck,
@@ -43,8 +43,8 @@ const MECHANICS = [
   },
   {
     icon: Receipt,
-    title: 'Prove what happened',
-    body: 'Track the work, pay from the agreement if money is involved, and end up with a record either of you can share and anyone can check.',
+    title: 'Paid when the network confirms',
+    body: 'Pay from the agreement in Nimiq Pay. A payment only counts as paid once PACT has seen it on the chain, and the record is one anyone can check.',
   },
 ]
 
@@ -193,7 +193,7 @@ export function Welcome() {
           </h1>
 
           <p className="rise mt-3.5 max-w-[34ch] text-balance text-body leading-relaxed text-chalk-muted" style={riseStyle(2)}>
-            Create clear agreements, coordinate the work, and pay from one shared PACT.
+            Post work, take it up, and get paid, all from one signed PACT.
           </p>
 
           <ul className="mt-9 w-full space-y-2.5 text-left">
