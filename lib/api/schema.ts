@@ -206,3 +206,28 @@ export const aiReviewSchema = z.object({
   specialTerms: z.array(z.string().max(300)).max(12).default([]),
   milestones: z.array(z.object({ title: z.string().max(120), amountMinor: minorAmount })).max(12).default([]),
 })
+
+// --- campaigns --------------------------------------------------------------------------
+
+export const createCampaignSchema = z
+  .object({
+    ownerName: text(80),
+    title: text(140),
+    // Bounded so the agreement made from a campaign always fits the pact's 2000 character
+    // deliverable limit: 1000 + 8 x (120 + 3) + headings is comfortably under it.
+    brief: text(1000),
+    requirements: z.array(text(120)).max(8).default([]),
+    currency: z.enum(CURRENCIES),
+    chain: z.enum(Object.keys(EVM_CHAINS) as [string, ...string[]]).nullable().default(null),
+    rewardMinor: minorAmount,
+    slots: z.number().int().min(1).max(500),
+    deadline: isoDate.nullable().default(null),
+  })
+  .refine((value) => (value.currency === 'USDT' ? value.chain !== null : value.chain === null), {
+    message: 'USDT campaigns need a network, and NIM campaigns must not have one.',
+    path: ['chain'],
+  })
+
+export const campaignStatusSchema = z.object({
+  status: z.enum(['OPEN', 'PAUSED', 'CLOSED', 'CANCELLED']),
+})

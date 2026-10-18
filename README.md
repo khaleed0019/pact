@@ -63,6 +63,12 @@ takes a fee, and does not exist inside the wallet where the money already is.
     can open to check the terms, the fingerprint and both signatures — without seeing your
     delivery notes, transaction references or full wallet addresses. Anyone can also look
     up a reference directly.
+11. **Post work, or take it up (Earn).** A brand posts a campaign: a brief, requirements, a
+    fixed reward and a number of spots. Anyone can browse; a signed-in person takes one up
+    and gets **their own ordinary PACT** with the brand — same signatures, same delivery
+    and review, same chain-verified payment. A campaign is only the offer; nothing after
+    "take this up" is special-cased. Spots are claimed atomically in the database, one per
+    person, and come back if that agreement is declined or cancelled.
 
 ---
 
@@ -113,6 +119,9 @@ funds. **So PACT never claims to.**
   5 delivered on time", never a bare 80%. `/stats` applies the same rule to the whole
   product, and every figure there is a `count(*)` over agreements that already exist —
   PACT records no page views, no sessions, and nothing about what any individual did.
+- A campaign's budget is not a deposit. It shows what the brand has *agreed to pay*
+  (reward x spots taken) and what the network has *confirmed paid*, and nothing in the
+  schema can express money being set aside.
 - Raising an issue records a disagreement. It does not adjudicate one, and it moves no
   money: there is no "upheld" or "rejected", because neither is something this app could
   honestly decide.
@@ -311,7 +320,7 @@ is worse than no number at all.
 npm run verify     # typecheck + honesty check + tests
 ```
 
-86 tests, no test framework dependency — Node runs the TypeScript directly.
+126 tests, no test framework dependency — Node runs the TypeScript directly.
 
 The ones worth knowing about:
 

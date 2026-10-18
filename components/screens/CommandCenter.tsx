@@ -181,9 +181,14 @@ export function CommandCenter() {
         <SectionTitle
           action={
             pacts.length > 0 ? (
-              <Link href="/trust" className="text-[0.7rem] font-medium text-chalk-muted underline underline-offset-4">
-                Trust profile
-              </Link>
+              <span className="flex gap-3">
+                <Link href="/pacts" className="text-[0.7rem] font-medium text-chalk-muted underline underline-offset-4">
+                  All agreements
+                </Link>
+                <Link href="/trust" className="text-[0.7rem] font-medium text-chalk-muted underline underline-offset-4">
+                  Trust profile
+                </Link>
+              </span>
             ) : undefined
           }
         >

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bell, FileStack, Home, Plus, UserRound } from 'lucide-react'
+import { Bell, Home, Megaphone, Plus, UserRound } from 'lucide-react'
 import { useSession } from '@/lib/client/session'
 import { cn } from '@/lib/cn'
 
@@ -13,7 +13,8 @@ import { cn } from '@/lib/cn'
  * for their own sake:
  *
  *   HOME     the Command Center — what needs you, right now
- *   PACTS    every agreement you're part of, not just the ones asking for attention
+ *   EARN     work brands are offering, and what you have taken up (see app/campaigns);
+ *            the full list of agreements moved to Home's "All agreements" link
  *   CREATE   the AI Pact Builder — raised, because starting a new PACT is the one action
  *            that should never be more than a thumb's reach away, on any screen this bar
  *            appears on
@@ -39,7 +40,7 @@ interface Tab {
 
 const TABS: Tab[] = [
   { href: '/', label: 'Home', icon: Home, match: (p) => p === '/' },
-  { href: '/pacts', label: 'Pacts', icon: FileStack, match: (p) => p.startsWith('/pacts') },
+  { href: '/campaigns', label: 'Earn', icon: Megaphone, match: (p) => p.startsWith('/campaigns') },
   { href: '/activity', label: 'Activity', icon: Bell, match: (p) => p.startsWith('/activity') },
   { href: '/trust', label: 'You', icon: UserRound, match: (p) => p.startsWith('/trust') },
 ]
