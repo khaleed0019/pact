@@ -75,11 +75,17 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
   const [copiedLink, setCopiedLink] = useState(false)
   const [sheet, setSheet] = useState<SheetKind>(null)
   const [payTarget, setPayTarget] = useState<Milestone | null>(null)
+  const [campaign, setCampaign] = useState<{ id: string; title: string } | null>(null)
 
   const load = useCallback(async () => {
     try {
-      const result = await api<{ pact: PactDetail; viewer: { role: ParticipantRole } }>(`/api/pacts/${id}`)
+      const result = await api<{
+        pact: PactDetail
+        viewer: { role: ParticipantRole }
+        campaign: { id: string; title: string } | null
+      }>(`/api/pacts/${id}`)
       setPact(result.pact)
+      setCampaign(result.campaign)
       setRole(result.viewer.role)
       setError(null)
     } catch (cause) {
@@ -336,6 +342,14 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
             )}
           </div>
           <p className="mt-2 text-small text-chalk-muted">{meta.blurb}</p>
+          {campaign && (
+            <Link
+              href={`/campaigns/${campaign.id}`}
+              className="mt-2 inline-flex max-w-full items-center gap-1 text-[0.7rem] font-medium text-azure-bright underline underline-offset-4"
+            >
+              <span className="truncate">From the campaign “{campaign.title}”</span>
+            </Link>
+          )}
           {usesPayment(pact.category) ? (
             <Money minor={pact.totalAmountMinor} currency={pact.currency} size="xl" className="mt-4 text-gold-bright" />
           ) : (

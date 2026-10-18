@@ -176,3 +176,16 @@ test('campaign input is bounded so the agreement made from it always fits', asyn
   assert.throws(() => createCampaignSchema.parse({ ...input, currency: 'USDT', chain: null }))
   assert.throws(() => createCampaignSchema.parse({ ...input, rewardMinor: '0' }))
 })
+
+test('the brand is told, and the pact points back at its campaign', async () => {
+  const { make, claim, repo, store } = setup()
+  const c = await make()
+  const { pact } = await claim(c.id, ALICE, 'Alice')
+
+  const nudges = await repo.refreshNotifications(BRAND)
+  const waiting = nudges.find((n) => n.pactId === pact.id && n.kind === 'ACCEPTANCE_PENDING')
+  assert.ok(waiting, 'someone taking the campaign up reaches the brand as a signature request')
+  assert.equal((await repo.refreshNotifications(ALICE)).some((n) => n.pactId === pact.id && n.kind === 'ACCEPTANCE_PENDING'), false, 'not the person who made it')
+
+  assert.equal((await store.getClaimByPact(pact.id))?.campaignId, c.id)
+})

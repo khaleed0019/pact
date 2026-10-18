@@ -119,10 +119,14 @@ export default function CampaignsPage() {
             <div className="surface">
               <EmptyState
                 icon={<Megaphone className="h-8 w-8" />}
-                title="Nothing open right now"
-                body="When a brand posts work it shows up here. You can post your own — set a reward, say what you need, and people can take it up."
+                title={data.mine.length > 0 ? 'Nothing from other brands yet' : 'Nothing open right now'}
+                body={
+                  data.mine.length > 0
+                    ? 'Work other brands post shows up here. Yours is listed above, and people can take it up from there.'
+                    : 'When a brand posts work it shows up here. You can post your own — set a reward, say what you need, and people can take it up.'
+                }
                 action={
-                  me?.signedIn ? (
+                  me?.signedIn && data.mine.length === 0 ? (
                     <Link href="/campaigns/new">
                       <Button>Post work</Button>
                     </Link>

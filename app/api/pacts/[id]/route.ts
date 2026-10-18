@@ -4,6 +4,7 @@ import { authed, body, ok } from '@/lib/api/handler'
 import { updateTermsSchema } from '@/lib/api/schema'
 import { loadPact, viewerOf } from '@/lib/api/pact-helpers'
 import { splitByPercent } from '@/lib/pact/money'
+import { getCampaignStore } from '@/lib/campaigns'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,7 +15,13 @@ export async function GET(_request: Request, context: Context): Promise<NextResp
     const { id } = await context.params
     const pact = await loadPact(id)
     const viewer = viewerOf(pact, session.address) // membership check, throws 403 otherwise
-    return ok({ pact, viewer })
+
+    // If this agreement came from a campaign, say so. Only parties reach this line, so the
+    // link is never shown to someone who couldn't already open the pact.
+    const store = getCampaignStore()
+    const claim = await store.getClaimByPact(pact.id)
+    const campaign = claim ? await store.getCampaign(claim.campaignId) : null
+    return ok({ pact, viewer, campaign: campaign && { id: campaign.id, title: campaign.title } })
   })
 }
 

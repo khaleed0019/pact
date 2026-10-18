@@ -88,7 +88,7 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
         >
           <ArrowLeft aria-hidden className="h-5 w-5" />
         </Link>
-        <h1 className="min-w-0 flex-1 truncate text-heading text-chalk">{campaign?.title ?? 'Campaign'}</h1>
+        <h1 className="min-w-0 flex-1 truncate text-heading text-chalk">Campaign</h1>
         {campaign && <CampaignStatusPill status={campaign.status} />}
       </header>
 
@@ -98,7 +98,8 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
       {detail && campaign && (
         <div className="space-y-6">
           <section className="surface px-4 py-4">
-            <p className="text-small text-chalk-muted">From {campaign.ownerName}</p>
+            <h2 className="text-balance text-title text-chalk">{campaign.title}</h2>
+            <p className="mt-1 text-small text-chalk-muted">From {campaign.ownerName}</p>
             <div className="mt-2 flex items-baseline justify-between gap-3">
               <Money minor={campaign.rewardMinor} currency={campaign.currency} size="xl" className="text-gold-bright" />
               <span className="text-small text-chalk-muted">per person</span>
