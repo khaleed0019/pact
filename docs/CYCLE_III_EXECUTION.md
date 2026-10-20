@@ -492,12 +492,12 @@ Nimiq Pay host, no funds) · **DB** live Supabase query · **B** in-app browser 
 | Supabase RLS / access control audit | DONE AND VERIFIED (DB) | All 16 `pact` relations: RLS on, 0 policies; `anon`/`authenticated`: no schema usage, no select, no execute on `claim_campaign_slot` |
 | Nimiq Pay host compatibility | NOT VERIFIED | Needs a run inside Nimiq Pay (owner) |
 | Mobile UI / accessibility | DONE AND VERIFIED (B) for new screens | 375px: role select, home, campaigns, detail + preview, pact progress, receipts, no horizontal overflow; focus ring visible; reduced motion and reduced transparency fallbacks. Dark theme only |
-| Production deployment | RE-VERIFY AFTER PUSH | Vercel project `pact` (team khaleed3) |
+| Production deployment | DONE AND VERIFIED (2026-10-20) | https://pact-nimiq.vercel.app serves commit 8cbe2bb (Vercel READY); smoke: / 200, /campaigns 200, /api/me 200 signedIn:false ephemeralStore:false, /api/dashboard 401 unauthenticated. E2E script NOT run against production (would write test data) |
 | Real two-wallet end-to-end journey | NOT DONE (H substitute only) | H is 32/32 but is not a Nimiq Pay run and has no real transaction |
 | Real usage / tester feedback | NOT DONE | none |
 | Competition category confirmed | DECIDED: **Pay** (2026-10-20) | miniappscompetition.com/cycle3: Earn = "staking or yield"; Pay = "bill splitting, merchant checkout, tipping, invoices, subscriptions". Pact pays for agreed work |
 | MIT license + public repo | DONE AND VERIFIED | github.com/khaleed0019/pact public; MIT in package.json + LICENSE |
-| Submission description and demo | DRAFTED, NOT FINAL | Earlier draft named Earn; must be revised for Pay |
+| Submission description and demo | DESCRIPTION DRAFTED (docs/SUBMISSION.md, 248 words, Pay); DEMO NOT RECORDED | Demo must be recorded from a real Nimiq Pay run |
 | Official submission | NOT DONE | Owner action |
 
 Status definitions: - `DONE AND VERIFIED`: acceptance criteria passed
