@@ -2,34 +2,25 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bell, Home, Megaphone, Plus, UserRound } from 'lucide-react'
+import { motion, useReducedMotion } from 'framer-motion'
+import { Bell, Briefcase, Home, Plus, Search, UserRound } from 'lucide-react'
 import { useSession } from '@/lib/client/session'
 import { cn } from '@/lib/cn'
 
 /**
- * The bottom tab bar.
+ * Primary navigation.
  *
- * Five destinations, matching what the product actually has rather than filling slots
- * for their own sake:
+ * On a phone it is a floating glass capsule above the home indicator: five targets, the
+ * raised centre one the action this role most often starts with. It floats rather than
+ * spanning the edge so content visibly continues beneath it, and pages reserve
+ * `TAB_BAR_SPACER` so nothing actionable ever ends up hidden behind it.
  *
- *   HOME     the Command Center — what needs you, right now
- *   EARN     work brands are offering, and what you have taken up (see app/campaigns);
- *            the full list of agreements moved to Home's "All agreements" link
- *   CREATE   the AI Pact Builder — raised, because starting a new PACT is the one action
- *            that should never be more than a thumb's reach away, on any screen this bar
- *            appears on
- *   ACTIVITY reminders and deadlines across every agreement (see app/activity) — this is
- *            Smart Reminders' actual screen; the data already existed in `/api/me` and
- *            had nowhere to be seen before this
- *   YOU      the trust profile — your record, not a vanity "profile" tab
+ * On a wide screen, an iPhone capsule would be an imitation, so the same destinations
+ * become a conventional top bar.
  *
- * Only rendered on screens with room for it: the dashboard, the full pacts list, activity
- * and the trust profile. Not on the Builder (which already ends in one big primary
- * button), not on a pact's own detail page (whose primary action is contextual and
- * already pinned to the same thumb zone), and not on the invite or welcome screens.
+ * The labels follow the role. A brand's centre action is posting work; a contributor's
+ * is finding it. The routes are the same — what changes is what the button says it does.
  */
-
-const NAV_HEIGHT = '4.5rem'
 
 interface Tab {
   href: string
@@ -38,58 +29,107 @@ interface Tab {
   match: (pathname: string) => boolean
 }
 
-const TABS: Tab[] = [
-  { href: '/', label: 'Home', icon: Home, match: (p) => p === '/' },
-  { href: '/campaigns', label: 'Earn', icon: Megaphone, match: (p) => p.startsWith('/campaigns') },
-  { href: '/activity', label: 'Activity', icon: Bell, match: (p) => p.startsWith('/activity') },
-  { href: '/trust', label: 'You', icon: UserRound, match: (p) => p.startsWith('/trust') },
-]
+function tabsFor(role: 'BRAND' | 'CONTRIBUTOR' | null | undefined): { tabs: Tab[]; centre: { href: string; label: string } } {
+  const work: Tab =
+    role === 'BRAND'
+      ? { href: '/campaigns', label: 'Campaigns', icon: Briefcase, match: (p) => p.startsWith('/campaigns') }
+      : { href: '/campaigns', label: 'Find work', icon: Search, match: (p) => p.startsWith('/campaigns') }
+  return {
+    tabs: [
+      { href: '/', label: 'Home', icon: Home, match: (p) => p === '/' },
+      work,
+      { href: '/activity', label: 'Activity', icon: Bell, match: (p) => p.startsWith('/activity') },
+      { href: '/trust', label: 'You', icon: UserRound, match: (p) => p.startsWith('/trust') },
+    ],
+    centre: role === 'BRAND' ? { href: '/campaigns/new', label: 'Post work' } : { href: '/new', label: 'Create a PACT' },
+  }
+}
 
 export function TabBar() {
   const pathname = usePathname()
   const { me } = useSession()
+  const reduceMotion = useReducedMotion()
   const unread = me?.notifications?.filter((n) => n.readAt === null).length ?? 0
-
-  const [left, right] = [TABS.slice(0, 2), TABS.slice(2)]
+  const { tabs, centre } = tabsFor(me?.role)
+  const [left, right] = [tabs.slice(0, 2), tabs.slice(2)]
 
   return (
-    <nav
-      aria-label="Primary"
-      className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto max-w-[34rem] border-t border-white/[0.07] bg-ink-900/92 backdrop-blur-lg"
-      style={{ paddingTop: '0.4rem' }}
-    >
-      <div className="relative grid grid-cols-5 items-start" style={{ height: NAV_HEIGHT }}>
-        {left.map((tab) => (
-          <TabLink key={tab.href} tab={tab} active={tab.match(pathname)} badge={tab.href === '/activity' ? unread : 0} />
-        ))}
+    <>
+      {/* Phone: floating capsule. */}
+      <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden">
+        <div className="glass-strong relative mx-auto grid max-w-[24rem] grid-cols-5 items-center rounded-[1.75rem] px-1.5 py-1.5">
+          {left.map((tab) => (
+            <TabLink key={tab.href} tab={tab} active={tab.match(pathname)} badge={tab.href === '/activity' ? unread : 0} animate={!reduceMotion} />
+          ))}
+          <div className="flex justify-center">
+            <Link
+              href={centre.href}
+              aria-label={centre.label}
+              className="focus-ring flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-b from-gold-bright to-gold text-ink-950 shadow-glow-gold transition-transform duration-150 active:scale-95"
+            >
+              <Plus aria-hidden className="h-6 w-6" strokeWidth={2.5} />
+            </Link>
+          </div>
+          {right.map((tab) => (
+            <TabLink key={tab.href} tab={tab} active={tab.match(pathname)} badge={tab.href === '/activity' ? unread : 0} animate={!reduceMotion} />
+          ))}
+        </div>
+      </nav>
 
-        {/* Raised centre action — always Create, never a toggled "active" state of its own. */}
-        <div className="flex items-start justify-center">
-          <Link
-            href="/new"
-            aria-label="Create a PACT"
-            className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-b from-gold-bright to-gold text-ink-950 shadow-glow-gold ring-4 ring-ink-900 transition-transform duration-150 active:scale-95"
-          >
-            <Plus aria-hidden className="h-6 w-6" strokeWidth={2.5} />
+      {/* Wide screens: a plain top bar. */}
+      <nav aria-label="Primary" className="glass-strong fixed inset-x-0 top-0 z-30 hidden border-x-0 border-t-0 md:block">
+        <div className="mx-auto flex h-14 max-w-[56rem] items-center gap-1 px-6">
+          <Link href="/" className="focus-ring mr-4 rounded-lg text-heading font-semibold tracking-tight text-chalk">
+            PACT
+          </Link>
+          {tabs.map((tab) => {
+            const active = tab.match(pathname)
+            return (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                aria-current={active ? 'page' : undefined}
+                className={cn(
+                  'focus-ring relative rounded-lg px-3 py-2 text-small font-medium transition-colors',
+                  active ? 'text-chalk' : 'text-chalk-muted hover:text-chalk',
+                )}
+              >
+                {tab.label}
+                {tab.href === '/activity' && unread > 0 && (
+                  <span className="tabular ml-1.5 rounded-full bg-rose px-1.5 text-[0.6rem] font-semibold text-white">{unread}</span>
+                )}
+                {active && <span aria-hidden className="absolute inset-x-3 -bottom-[0.6rem] h-0.5 rounded-full bg-gold" />}
+              </Link>
+            )
+          })}
+          <Link href={centre.href} className="ml-auto">
+            <span className="focus-ring inline-flex h-9 items-center gap-1.5 rounded-xl bg-gradient-to-b from-gold-bright to-gold px-3.5 text-small font-semibold text-ink-950">
+              <Plus aria-hidden className="h-4 w-4" strokeWidth={2.5} />
+              {centre.label}
+            </span>
           </Link>
         </div>
-
-        {right.map((tab) => (
-          <TabLink key={tab.href} tab={tab} active={tab.match(pathname)} badge={tab.href === '/activity' ? unread : 0} />
-        ))}
-      </div>
-    </nav>
+      </nav>
+    </>
   )
 }
 
-function TabLink({ tab, active, badge }: { tab: Tab; active: boolean; badge: number }) {
+function TabLink({ tab, active, badge, animate }: { tab: Tab; active: boolean; badge: number; animate: boolean }) {
   const Icon = tab.icon
   return (
     <Link
       href={tab.href}
       aria-current={active ? 'page' : undefined}
-      className="flex min-h-tap flex-col items-center gap-1 pt-1.5 text-center"
+      className="focus-ring relative flex min-h-tap flex-col items-center justify-center gap-0.5 rounded-2xl py-1 text-center"
     >
+      {active && (
+        <motion.span
+          layoutId={animate ? 'tab-highlight' : undefined}
+          aria-hidden
+          className="absolute inset-0 rounded-2xl bg-white/[0.07]"
+          transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+        />
+      )}
       <span className="relative">
         <Icon aria-hidden className={cn('h-5 w-5', active ? 'text-gold-bright' : 'text-chalk-faint')} strokeWidth={active ? 2.4 : 2} />
         {badge > 0 && (
@@ -101,7 +141,7 @@ function TabLink({ tab, active, badge }: { tab: Tab; active: boolean; badge: num
           </span>
         )}
       </span>
-      <span className={cn('text-[0.65rem] font-medium tracking-wide', active ? 'text-gold-bright' : 'text-chalk-faint')}>
+      <span className={cn('relative text-[0.62rem] font-medium tracking-wide', active ? 'text-gold-bright' : 'text-chalk-faint')}>
         {tab.label}
         {badge > 0 && <span className="sr-only"> — {badge} unread</span>}
       </span>
@@ -109,5 +149,8 @@ function TabLink({ tab, active, badge }: { tab: Tab; active: boolean; badge: num
   )
 }
 
-/** Bottom padding so page content clears the fixed bar. Use on every screen that renders it. */
-export const TAB_BAR_SPACER = 'pb-24'
+/**
+ * Space pages reserve so content clears the bar: bottom on phones (capsule + its margin),
+ * top on wide screens (the fixed top bar). Use on every screen that renders it.
+ */
+export const TAB_BAR_SPACER = 'pb-28 md:pb-10 md:pt-16'

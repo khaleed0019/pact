@@ -40,7 +40,7 @@ export function AppChrome({ children }: { children: ReactNode }) {
       {notice && !dismissed && (
         <div
           role="status"
-          className="safe-top sticky top-0 z-40 flex items-center gap-2.5 border-b border-gold/20 bg-gold/[0.09] px-4 py-2 backdrop-blur"
+          className="safe-top sticky top-0 z-40 flex items-center gap-2.5 border-b border-gold/20 md:top-14 md:mt-14 bg-gold/[0.09] px-4 py-2 backdrop-blur"
         >
           <FlaskConical aria-hidden className="h-3.5 w-3.5 shrink-0 text-gold-bright" />
           <p className="min-w-0 flex-1 text-[0.7rem] leading-snug text-chalk">{notice.text}</p>

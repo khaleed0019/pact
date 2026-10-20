@@ -5,6 +5,7 @@ import { sumMinor } from '../pact/money.ts'
 import { toVerificationRecord } from '../pact/verification.ts'
 import { canPaymentTransition } from '../pact/paymentState.ts'
 import { normalizeAddress } from '../nimiq/address.ts'
+import type { AppRole } from '../pact/roles.ts'
 import type {
   Activity,
   ActivityKind,
@@ -62,6 +63,7 @@ interface Tables {
   // Keyed by normalized address. Mirrors Supabase's `profiles` table: an explicit name
   // set once here always wins over whatever a single pact's participant row says.
   profiles: Map<string, string>
+  roles: Map<string, AppRole>
 }
 
 function emptyTables(): Tables {
@@ -71,6 +73,7 @@ function emptyTables(): Tables {
     milestones: new Map(),
     payments: new Map(),
     profiles: new Map(),
+    roles: new Map(),
     deliverables: new Map(),
     negotiations: new Map(),
     disputes: new Map(),
@@ -802,6 +805,14 @@ export class MemoryRepository implements Repository {
   /** See Repository.updateProfile. */
   async updateProfile(address: string, displayName: string): Promise<void> {
     this.t.profiles.set(normalizeAddress(address), displayName)
+  }
+
+  async getRole(address: string): Promise<AppRole | null> {
+    return this.t.roles.get(normalizeAddress(address)) ?? null
+  }
+
+  async setRole(address: string, role: AppRole): Promise<void> {
+    this.t.roles.set(normalizeAddress(address), role)
   }
 
   async getProductStats(): Promise<ProductStats> {

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Megaphone, Plus } from 'lucide-react'
 import { api, toUserFacing } from '@/lib/client/api'
 import { useSession } from '@/lib/client/session'
-import { CampaignCard } from '@/components/campaigns/CampaignCard'
+import { CampaignCard, CampaignCardSkeleton } from '@/components/campaigns/CampaignCard'
 import { TabBar, TAB_BAR_SPACER } from '@/components/nav/TabBar'
 import { Button } from '@/components/ui/Button'
 import { EmptyState, ErrorNotice, SectionTitle, Skeleton, StatusPill } from '@/components/ui/Bits'
@@ -67,8 +67,8 @@ export default function CampaignsPage() {
   return (
     <main className={cn('mx-auto w-full max-w-[34rem] px-5', TAB_BAR_SPACER)}>
       <header className="safe-top flex items-center justify-between gap-3 py-4">
-        <h1 className="text-display text-chalk">Earn</h1>
-        {me?.signedIn && (
+        <h1 className="text-display text-chalk">{me?.role === 'BRAND' ? 'Campaigns' : 'Find work'}</h1>
+        {me?.role === 'BRAND' && (
           <Link href="/campaigns/new">
             <Button size="sm">
               <Plus aria-hidden className="h-4 w-4" />
@@ -88,7 +88,7 @@ export default function CampaignsPage() {
       {data === null && !error && (
         <div className="space-y-2.5">
           {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-24" />
+            <CampaignCardSkeleton key={i} />
           ))}
         </div>
       )}
@@ -183,7 +183,7 @@ export default function CampaignsPage() {
                     : 'When a brand posts work it shows up here. You can post your own — set a reward, say what you need, and people can take it up.'
                 }
                 action={
-                  me?.signedIn && data.mine.length === 0 ? (
+                  me?.role === 'BRAND' && data.mine.length === 0 ? (
                     <Link href="/campaigns/new">
                       <Button>Post work</Button>
                     </Link>

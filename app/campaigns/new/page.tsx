@@ -96,6 +96,17 @@ export default function NewCampaignPage() {
 
       {!me?.signedIn ? (
         <p className="text-small text-chalk-muted">Sign in with your Nimiq wallet to post work.</p>
+      ) : me.role !== 'BRAND' ? (
+        <div className="surface px-4 py-4">
+          <p className="text-heading text-chalk">Posting work is for brands</p>
+          <p className="mt-1 text-small leading-relaxed text-chalk-muted">
+            You’re using PACT as a contributor. Switch to Brand in your profile to post a campaign — agreements you
+            already have stay exactly as they are.
+          </p>
+          <Link href="/trust" className="mt-3 inline-block text-small font-medium text-gold-bright underline underline-offset-4">
+            Go to your profile
+          </Link>
+        </div>
       ) : (
         <div className="space-y-5">
           <Field label="What’s the work?">

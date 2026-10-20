@@ -3,7 +3,8 @@ import { RepoError } from '../db/repo.ts'
 import { normalizeAddress } from '../nimiq/address.ts'
 import { SLOT_RELEASING, summariseBudget } from './model.ts'
 import type { BudgetSummary, Campaign, CampaignClaim } from './model.ts'
-import type { CampaignStore, ClaimRecord } from './store.ts'
+import type { CampaignStore, ClaimRecord, CreateCampaignInput } from './store.ts'
+import { ROLE_REQUIRED, roleBlockMessage, type AppRole } from '../pact/roles.ts'
 import type { PactDetail, PactStatus } from '../pact/types.ts'
 
 /**
@@ -25,6 +26,17 @@ export function termsFromCampaign(campaign: Campaign): { deliverable: string; pa
   }
 }
 
+/** Refuse unless the stored role for this verified address is `needed`. */
+export async function assertRole(repo: Repository, address: string, needed: AppRole): Promise<void> {
+  if ((await repo.getRole(address)) !== needed) throw new RepoError('NOT_ALLOWED', roleBlockMessage(needed))
+}
+
+/** Post a campaign. Brands only — checked against storage, not the request. */
+export async function postCampaign(repo: Repository, store: CampaignStore, input: CreateCampaignInput): Promise<Campaign> {
+  await assertRole(repo, input.ownerAddress, ROLE_REQUIRED.postCampaign)
+  return store.createCampaign(input)
+}
+
 /**
  * Take a campaign up: reserve a slot, then create the ordinary two-party PACT for it.
  *
@@ -38,6 +50,7 @@ export async function claimCampaign(
   store: CampaignStore,
   input: { campaignId: string; jobberAddress: string; jobberName: string; today: string },
 ): Promise<{ claim: CampaignClaim; pact: PactDetail }> {
+  await assertRole(repo, input.jobberAddress, ROLE_REQUIRED.claimCampaign)
   const campaign = await store.getCampaign(input.campaignId)
   if (!campaign) throw new RepoError('NOT_FOUND', 'That campaign does not exist.')
 
@@ -125,7 +138,8 @@ export async function overviewOf(repo: Repository, store: CampaignStore, campaig
       pactStatus: pact?.status ?? null,
       jobberName: provider?.displayName ?? 'Someone',
       sealed,
-      awaitingBrandSignature: !!pact && !!brand && !brand.sealSignature && !!provider?.sealSignature,
+      awaitingBrandSignature:
+        !!pact && !!brand && !brand.sealSignature && (pact.status === 'PENDING' || pact.status === 'NEGOTIATING'),
       awaitingReview: !!pact?.deliverables.some((d) => d.status === 'SUBMITTED'),
       pendingDelivery: pendingOf(pact),
       paidMinor: confirmed.reduce((sum, p) => sum + BigInt(p.amountMinor), 0n).toString(),

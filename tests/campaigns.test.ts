@@ -4,10 +4,11 @@ import { MemoryRepository } from '../lib/db/memory.ts'
 import { isRepoError } from '../lib/db/repo.ts'
 import { MemoryCampaignStore } from '../lib/campaigns/memory.ts'
 import { canCampaignTransition } from '../lib/campaigns/model.ts'
-import { claimCampaign, overviewOf, termsFromCampaign } from '../lib/campaigns/service.ts'
+import { claimCampaign, overviewOf, postCampaign, termsFromCampaign } from '../lib/campaigns/service.ts'
 import { reconcilePayment } from '../lib/api/reconcile.ts'
 import { DEFAULT_CONFIG } from '../lib/nimiq/verifyPayment.ts'
 import { createCampaignSchema } from '../lib/api/schema.ts'
+import { brandDashboard, contributorDashboard } from '../lib/campaigns/dashboard.ts'
 
 const BRAND = 'NQ340000000000000000000000000000000'
 const ALICE = 'NQ260000000000000000000000000000000'
@@ -18,6 +19,8 @@ const TODAY = '2026-10-18'
 function setup(slots = 2) {
   const repo = new MemoryRepository()
   const store = new MemoryCampaignStore(async (id) => (await repo.getPactById(id))?.status ?? null)
+  void repo.setRole(BRAND, 'BRAND')
+  for (const who of [ALICE, BOB, CAROL]) void repo.setRole(who, 'CONTRIBUTOR')
   const make = (over: Partial<Parameters<typeof store.createCampaign>[0]> = {}) =>
     store.createCampaign({
       ownerAddress: BRAND,
@@ -206,4 +209,76 @@ test('submitted work shows up for the brand to review from the campaign', async 
 
   await repo.reviewDeliverable({ deliverableId: row.pendingDelivery!.id, actor: BRAND, status: 'APPROVED', reviewNote: null })
   assert.equal((await overviewOf(repo, store, c)).claims[0].pendingDelivery, null)
+})
+
+test('roles are enforced on the server: brands post, contributors take up', async () => {
+  const { repo, store, make } = setup()
+  const c = await make()
+  const input = { ...c, ownerAddress: ALICE } as Parameters<typeof postCampaign>[2]
+  await assert.rejects(postCampaign(repo, store, input), code('NOT_ALLOWED'), 'a contributor cannot post')
+  await repo.setRole(ALICE, 'BRAND')
+  await assert.rejects(
+    claimCampaign(repo, store, { campaignId: c.id, jobberAddress: ALICE, jobberName: 'A', today: TODAY }),
+    code('NOT_ALLOWED'),
+    'a brand cannot take work up',
+  )
+  const fresh = 'NQ5000000000000000000000000000000000'
+  await assert.rejects(
+    claimCampaign(repo, store, { campaignId: c.id, jobberAddress: fresh, jobberName: 'N', today: TODAY }),
+    code('NOT_ALLOWED'),
+    'no role chosen yet means no campaign actions',
+  )
+})
+
+test('choosing a role is idempotent and switching keeps one profile', async () => {
+  const repo = new MemoryRepository()
+  assert.equal(await repo.getRole(ALICE), null)
+  await repo.setRole(ALICE, 'CONTRIBUTOR')
+  await repo.setRole(ALICE, 'CONTRIBUTOR')
+  assert.equal(await repo.getRole(ALICE), 'CONTRIBUTOR')
+  await repo.updateProfile(ALICE, 'Alice')
+  await repo.setRole(ALICE, 'BRAND')
+  assert.equal(await repo.getRole(ALICE), 'BRAND')
+  assert.equal((await repo.getTrustMetrics(ALICE)).displayName, 'Alice', 'switching role leaves the name alone')
+})
+
+test('dashboards are counted from records, per currency, and never call sent "paid"', async () => {
+  const { make, claim, repo, store } = setup(3)
+  const c = await make({ slots: 3 })
+  await make({ title: 'Second', slots: 2 })
+
+  let alice = await contributorDashboard(repo, store, ALICE)
+  assert.equal(alice.openOpportunities, 2)
+  assert.equal(alice.activeWork, 0)
+
+  const { pact } = await claim(c.id, ALICE, 'Alice')
+  alice = await contributorDashboard(repo, store, ALICE)
+  assert.equal(alice.openOpportunities, 1, 'a campaign you took up is no longer an opportunity')
+  assert.equal(alice.activeWork, 1)
+
+  let brand = await brandDashboard(repo, store, BRAND)
+  assert.equal(brand.liveCampaigns, 2)
+  assert.equal(brand.people, 1)
+  assert.equal(brand.openSpots, 4)
+  assert.equal(brand.potential.NIM, '200000000')
+  assert.equal(brand.agreed.NIM, '40000000')
+  assert.equal(brand.verified.NIM ?? '0', '0')
+  assert.equal(brand.awaitingSignature.length, 1, 'the brand has not signed, so it is on their list')
+
+  await repo.recordSeal({ pactId: pact.id, address: ALICE, signature: 'a'.repeat(128), publicKey: 'b'.repeat(64) })
+  await repo.recordSeal({ pactId: pact.id, address: BRAND, signature: 'c'.repeat(128), publicKey: 'd'.repeat(64) })
+  await repo.submitDeliverable({ pactId: pact.id, milestoneId: null, submittedBy: ALICE, note: 'Done', link: null })
+  brand = await brandDashboard(repo, store, BRAND)
+  assert.equal(brand.reviewQueue.length, 1)
+  assert.equal((await contributorDashboard(repo, store, ALICE)).awaitingReview.length, 1)
+
+  const payment = await repo.recordPayment({
+    pactId: pact.id, milestoneId: null, fromAddress: BRAND, toAddress: ALICE,
+    amountMinor: '40000000', currency: 'NIM', chain: null, memo: null, idempotencyKey: 'd1',
+  })
+  await repo.updatePaymentStatus({ paymentId: payment.id, status: 'SUBMITTED', txReference: 'a'.repeat(64) })
+  alice = await contributorDashboard(repo, store, ALICE)
+  assert.equal(alice.pending.NIM, '40000000')
+  assert.equal(alice.verified.NIM ?? '0', '0', 'sent is pending, not earned')
+  assert.equal((await brandDashboard(repo, store, BRAND)).pending.NIM, '40000000')
 })

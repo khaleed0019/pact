@@ -7,8 +7,10 @@ import { ArrowLeft, ChevronRight } from 'lucide-react'
 import { api, toUserFacing } from '@/lib/client/api'
 import { useSession } from '@/lib/client/session'
 import { formatWithCurrency } from '@/lib/pact/money'
-import { relativeDeadline } from '@/lib/format'
+import { formatLongDate, relativeDeadline } from '@/lib/format'
 import { CLAIM_BLOCKER_MESSAGE } from '@/lib/campaigns/model'
+import { termsFromCampaign } from '@/lib/campaigns/service'
+import { EVM_CHAINS } from '@/lib/pact/types'
 import type { BudgetSummary, Campaign, ClaimBlocker } from '@/lib/campaigns/model'
 import type { ClaimOverview } from '@/lib/campaigns/service'
 import { CampaignStatusPill } from '@/components/campaigns/CampaignCard'
@@ -35,6 +37,7 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
   const [error, setError] = useState<UserFacingError | null>(null)
   const [busy, setBusy] = useState(false)
   const [name, setName] = useState('')
+  const [previewing, setPreviewing] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -138,29 +141,42 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
                     Sign in to take this up
                   </Button>
                 </Link>
+              ) : me?.role !== 'CONTRIBUTOR' ? (
+                <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3">
+                  <p className="text-small text-chalk-muted">
+                    Taking up work is for contributors. You’re using PACT as a brand.
+                  </p>
+                  <Link href="/trust" className="mt-1.5 inline-block text-small font-medium text-gold-bright underline underline-offset-4">
+                    Switch in your profile
+                  </Link>
+                </div>
               ) : detail.blocker ? (
                 <p className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3 text-small text-chalk-muted">
                   {CLAIM_BLOCKER_MESSAGE[detail.blocker]}
                 </p>
+              ) : !previewing ? (
+                <Button size="lg" fullWidth onClick={() => setPreviewing(true)}>
+                  Review the agreement
+                </Button>
               ) : (
                 <>
+                  <AgreementPreview campaign={campaign} />
                   {!me?.displayName && (
                     <input
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="Your name"
+                      placeholder="Your name, as the brand will see it"
                       aria-label="Your name"
                       maxLength={80}
-                      className="min-h-tap w-full rounded-xl border border-white/[0.09] bg-black/25 px-3.5 py-3 text-body text-chalk placeholder:text-chalk-faint focus:border-gold/50 focus:outline-none"
+                      className="focus-ring min-h-tap w-full rounded-xl border border-white/[0.09] bg-black/25 px-3.5 py-3 text-body text-chalk placeholder:text-chalk-faint focus:border-gold/50"
                     />
                   )}
                   <Button size="lg" fullWidth busy={busy} disabled={!name && !me?.displayName} onClick={() => void claim()}>
-                    Take this up
+                    Take this up — you’ll sign next
                   </Button>
-                  <p className="px-1 text-[0.7rem] leading-relaxed text-chalk-faint">
-                    This creates your own agreement with {campaign.ownerName}. Nothing is owed until you’ve both signed
-                    it, and they pay you directly once they approve your work.
-                  </p>
+                  <Button variant="ghost" fullWidth disabled={busy} onClick={() => setPreviewing(false)}>
+                    Not yet
+                  </Button>
                 </>
               )}
             </section>
@@ -313,6 +329,44 @@ function PersonRow({ claim: c, onChanged }: { claim: ClaimOverview; onChanged: (
         </div>
       )}
     </li>
+  )
+}
+
+/**
+ * Exactly the terms taking this up will create — built by the same function the server
+ * uses (`termsFromCampaign`), so what you read here is what you will be asked to sign.
+ */
+function AgreementPreview({ campaign }: { campaign: Campaign }) {
+  const terms = termsFromCampaign(campaign)
+  return (
+    <div className="surface overflow-hidden">
+      <div className="border-b border-white/[0.06] px-4 py-3">
+        <p className="text-micro uppercase tracking-wider text-chalk-faint">The agreement you’ll get</p>
+        <p className="mt-1 text-heading text-chalk">{campaign.title}</p>
+      </div>
+      <dl className="divide-y divide-white/[0.06]">
+        <Line label="Between" value={`You and ${campaign.ownerName}`} />
+        <Line label="You’re paid" value={formatWithCurrency(campaign.rewardMinor, campaign.currency)} strong />
+        <Line label="Network" value={campaign.chain ? `USDT on ${EVM_CHAINS[campaign.chain].name}` : 'Nimiq'} />
+        <Line label="Deadline" value={campaign.deadline ? formatLongDate(campaign.deadline) : 'None set'} />
+      </dl>
+      <div className="space-y-3 border-t border-white/[0.06] px-4 py-3">
+        <div>
+          <p className="text-[0.7rem] font-medium text-chalk-faint">What you deliver</p>
+          <p className="mt-1 whitespace-pre-line text-small leading-relaxed text-chalk">{terms.deliverable}</p>
+        </div>
+        <div>
+          <p className="text-[0.7rem] font-medium text-chalk-faint">When you’re paid</p>
+          <p className="mt-1 text-small text-chalk">{terms.paymentCondition}</p>
+        </div>
+        <ul className="space-y-1 text-[0.7rem] leading-relaxed text-chalk-muted">
+          <li>· Nothing is binding until you and the brand have both signed it with your wallets.</li>
+          <li>· The brand can approve your work or ask for changes, with a reason.</li>
+          <li>· Payment goes wallet to wallet. PACT doesn’t hold it, and marks it paid only once the network confirms.</li>
+          <li>· If the brand declines the agreement, your spot goes back and nothing is owed.</li>
+        </ul>
+      </div>
+    </div>
   )
 }
 

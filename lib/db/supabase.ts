@@ -6,6 +6,7 @@ import { sumMinor } from '../pact/money.ts'
 import { toVerificationRecord } from '../pact/verification.ts'
 import { canPaymentTransition } from '../pact/paymentState.ts'
 import { normalizeAddress } from '../nimiq/address.ts'
+import { isAppRole, type AppRole } from '../pact/roles.ts'
 import type {
   Activity,
   ActivityKind,
@@ -1068,6 +1069,29 @@ export class SupabaseRepository implements Repository {
       .from('profiles')
       .upsert({ address: normalized, display_name: displayName }, { onConflict: 'address' })
     if (error) fail(error, 'Could not update your profile.')
+  }
+
+  async getRole(address: string): Promise<AppRole | null> {
+    const { data, error } = await this.db
+      .from('profiles')
+      .select('role')
+      .eq('address', normalizeAddress(address))
+      .maybeSingle()
+    // A failed lookup must not read as "no role" — that would re-ask a returning user and
+    // let them overwrite their choice without meaning to.
+    if (error) fail(error, 'Could not load your profile.')
+    const role = (data as Row | null)?.role
+    return isAppRole(role) ? role : null
+  }
+
+  async setRole(address: string, role: AppRole): Promise<void> {
+    const normalized = await this.ensureUser(address)
+    // Upsert on the primary key: one profile per address, and only `role` is written, so
+    // an existing display name is left exactly as it was.
+    const { error } = await this.db
+      .from('profiles')
+      .upsert({ address: normalized, role, role_chosen_at: new Date().toISOString() }, { onConflict: 'address' })
+    if (error) fail(error, 'Could not save your role.')
   }
 
   /**

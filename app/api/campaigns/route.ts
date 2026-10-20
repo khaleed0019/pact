@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getCampaignStore } from '@/lib/campaigns'
-import { cardsFor } from '@/lib/campaigns/service'
+import { cardsFor, postCampaign } from '@/lib/campaigns/service'
 import { authed, body, guard, ok } from '@/lib/api/handler'
+import { getRepository } from '@/lib/db'
 import { createCampaignSchema } from '@/lib/api/schema'
 import { readSession } from '@/lib/auth/session'
 import type { EvmChainKey } from '@/lib/pact/types'
@@ -34,7 +35,8 @@ export async function GET(): Promise<NextResponse> {
 export async function POST(request: Request): Promise<NextResponse> {
   return authed(async ({ session }) => {
     const input = await body(request, createCampaignSchema)
-    const campaign = await getCampaignStore().createCampaign({
+    // Brands only; the role is read from storage for the signed-in address (see postCampaign).
+    const campaign = await postCampaign(getRepository(), getCampaignStore(), {
       ownerAddress: session.address,
       ownerName: input.ownerName,
       title: input.title,

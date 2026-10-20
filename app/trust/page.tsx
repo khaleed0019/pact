@@ -1,7 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { BarChart3, Check, Pencil, ShieldCheck, X } from 'lucide-react'
+import { BarChart3, Check, Pencil, Repeat2, ShieldCheck, X } from 'lucide-react'
+import { RoleSelect } from '@/components/screens/RoleSelect'
+import { ROLE_META } from '@/lib/pact/roles'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { useSession } from '@/lib/client/session'
@@ -139,6 +141,9 @@ function DisplayNameEditor({ name, onSaved }: { name: string; onSaved: (name: st
 
 export default function TrustPage() {
   const { me, loading, refresh } = useSession()
+  const [switching, setSwitching] = useState(false)
+
+  if (switching) return <RoleSelect mode="switch" onDone={() => setSwitching(false)} />
 
   if (loading) {
     return (
@@ -178,6 +183,24 @@ export default function TrustPage() {
           <p className="mt-2 text-[0.7rem] text-chalk-faint">On PACT since {formatLongDate(trust.firstSeenAt)}</p>
         )}
       </motion.section>
+
+      {me?.role && (
+        <section className="surface mb-4 flex items-center justify-between gap-3 px-4 py-3.5">
+          <div className="min-w-0">
+            <p className="text-micro uppercase tracking-wider text-chalk-faint">Using PACT as</p>
+            <p className="mt-1 text-heading text-chalk">{ROLE_META[me.role].label}</p>
+            <p className="mt-0.5 text-[0.7rem] text-chalk-muted">{ROLE_META[me.role].pitch}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSwitching(true)}
+            className="focus-ring inline-flex min-h-tap shrink-0 items-center gap-1.5 rounded-xl border border-white/10 px-3 text-small font-medium text-chalk active:bg-white/[0.06]"
+          >
+            <Repeat2 aria-hidden className="h-4 w-4" />
+            Switch
+          </button>
+        </section>
+      )}
 
       {!hasHistory ? (
         <div className="surface">

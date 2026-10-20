@@ -227,8 +227,8 @@ export function Welcome() {
           {error && <ErrorNotice error={error} />}
 
           <Button size="lg" fullWidth busy={connecting} onClick={() => void signInWithWallet()}>
-            Create your first PACT
-            <ArrowRight aria-hidden className="h-4 w-4" />
+            {connecting ? 'Waiting for your wallet…' : 'Continue with Nimiq Pay'}
+            {!connecting && <ArrowRight aria-hidden className="h-4 w-4" />}
           </Button>
 
           <Button variant="secondary" size="lg" fullWidth disabled={connecting} onClick={() => void signInAsDemo()}>
@@ -237,7 +237,10 @@ export function Welcome() {
 
           <p className="px-2 pt-1 text-center text-[0.7rem] leading-relaxed text-chalk-faint">
             {inNimiqPay ? (
-              <>Signing in asks your wallet to sign a short message. It never approves a payment.</>
+              <>
+                PACT uses your wallet to prove it’s you: it asks you to sign a short message. That never approves a
+                payment, and PACT never sees your recovery phrase or keys.
+              </>
             ) : (
               <>
                 You’re outside Nimiq Pay, so signing and payments aren’t available here. The demo shows the full product

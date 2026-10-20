@@ -1,5 +1,7 @@
 'use client'
 
+import type { AppRole } from '@/lib/pact/roles'
+
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, toUserFacing } from './api.ts'
 import { connectWallet, detectEnvironment, detectLocale, signMessage } from '../nimiq/provider.ts'
@@ -18,6 +20,7 @@ export interface MeResponse {
   signedIn: boolean
   address?: string
   displayName?: string
+  role?: AppRole | null
   demo?: boolean
   pacts?: Pact[]
   trust?: TrustMetrics
@@ -37,6 +40,8 @@ interface SessionValue {
   signInWithWallet: () => Promise<void>
   signInAsDemo: () => Promise<void>
   signOut: () => Promise<void>
+  /** Save the product role for the signed-in wallet, then reload `me`. Throws on failure. */
+  chooseRole: (role: AppRole) => Promise<void>
 }
 
 const SessionContext = createContext<SessionValue | null>(null)
@@ -120,9 +125,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [refresh, me?.capabilities])
 
+  const chooseRole = useCallback(
+    async (role: AppRole) => {
+      await api('/api/me/role', { method: 'PATCH', body: { role } })
+      await refresh()
+    },
+    [refresh],
+  )
+
   const value = useMemo<SessionValue>(
-    () => ({ loading, me, error, environment, locale, connecting, refresh, signInWithWallet, signInAsDemo, signOut }),
-    [loading, me, error, environment, locale, connecting, refresh, signInWithWallet, signInAsDemo, signOut],
+    () => ({ loading, me, error, environment, locale, connecting, refresh, signInWithWallet, signInAsDemo, signOut, chooseRole }),
+    [loading, me, error, environment, locale, connecting, refresh, signInWithWallet, signInAsDemo, signOut, chooseRole],
   )
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>

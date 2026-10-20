@@ -1,27 +1,36 @@
 'use client'
 
+import { useState } from 'react'
 import { useSession } from '@/lib/client/session'
 import { Welcome } from '@/components/screens/Welcome'
+import { RoleSelect } from '@/components/screens/RoleSelect'
 import { CommandCenter, DashboardSkeleton } from '@/components/screens/CommandCenter'
 import { AppChrome } from '@/components/screens/AppChrome'
 import { TabBar } from '@/components/nav/TabBar'
 
 /**
- * The entry point decides between three states and nothing else.
+ * The entry point decides between four states and nothing else:
  *
- * Loading renders the dashboard's own skeleton rather than a spinner, so the layout does
- * not jump when data lands — on a phone that shift is the difference between an app that
- * feels considered and one that feels cheap.
+ *   loading           the dashboard's own skeleton, so nothing jumps when data lands
+ *   signed out        Welcome — continue with Nimiq Pay, or explore the demo
+ *   signed in, no role  the Brand / Contributor choice (asked once, then restored)
+ *   signed in         the role dashboard
+ *
+ * The role comes from `/api/me`, which reads it from storage for the signed-in address,
+ * so a returning user lands on their dashboard without being asked again.
  */
 export default function HomePage() {
   const { loading, me } = useSession()
+  const [switching, setSwitching] = useState(false)
 
   if (loading) return <DashboardSkeleton />
   if (!me?.signedIn) return <Welcome />
+  if (!me.role) return <RoleSelect />
+  if (switching) return <RoleSelect mode="switch" onDone={() => setSwitching(false)} />
 
   return (
     <AppChrome>
-      <CommandCenter />
+      <CommandCenter onSwitchRole={() => setSwitching(true)} />
       <TabBar />
     </AppChrome>
   )

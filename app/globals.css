@@ -387,3 +387,69 @@
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * Glass — used on purpose, and only in a few places.
+ *
+ * Liquid-Glass-inspired material for things that float above content: the wallet capsule,
+ * the floating tab bar, the role chooser and popovers. Never for terms, amounts or
+ * payment status — those stay on the opaque `.surface`, because a number you are about to
+ * pay should not be read through a blur.
+ *
+ * The material is three layers: a translucent fill with saturation boost, a hairline edge
+ * that is brighter on top (light catching the rim), and a soft drop shadow.
+ */
+@layer components {
+  .glass {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.035));
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.14),
+      inset 0 -1px 0 0 rgba(255, 255, 255, 0.03),
+      0 12px 40px -16px rgba(0, 0, 0, 0.85);
+  }
+  /* Denser variant for surfaces that carry text over moving content (the tab bar). */
+  .glass-strong {
+    background: linear-gradient(180deg, rgba(23, 27, 33, 0.78), rgba(11, 13, 16, 0.86));
+    -webkit-backdrop-filter: blur(24px) saturate(170%);
+    backdrop-filter: blur(24px) saturate(170%);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.1),
+      0 18px 48px -18px rgba(0, 0, 0, 0.95);
+  }
+  /* A selected glass option: the rim warms to the brand gold. */
+  .glass-selected {
+    border-color: rgba(233, 178, 19, 0.55);
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.16),
+      0 0 0 1px rgba(233, 178, 19, 0.25),
+      0 18px 48px -18px rgba(233, 178, 19, 0.35);
+  }
+  /* Consistent keyboard focus everywhere it is used. */
+  .focus-ring {
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900;
+  }
+}
+
+/*
+ * Reduced transparency. Where the platform asks for it (and where backdrop-filter is not
+ * supported at all), glass falls back to an opaque raised surface so nothing becomes hard
+ * to read.
+ */
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .glass-strong {
+    background: #171b21;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass,
+  .glass-strong {
+    background: #171b21;
+  }
+}

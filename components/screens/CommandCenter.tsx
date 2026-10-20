@@ -13,6 +13,8 @@ import { TAB_BAR_SPACER } from '@/components/nav/TabBar'
 import { Button } from '@/components/ui/Button'
 import { EmptyState, SectionTitle, Skeleton } from '@/components/ui/Bits'
 import { cn } from '@/lib/cn'
+import { WalletCapsule } from '@/components/nav/WalletCapsule'
+import { RoleDashboard } from '@/components/screens/RoleDashboard'
 
 /**
  * The Command Center.
@@ -92,7 +94,7 @@ export function DashboardSkeleton() {
   )
 }
 
-export function CommandCenter() {
+export function CommandCenter({ onSwitchRole }: { onSwitchRole: () => void }) {
   const { me } = useSession()
 
   const pacts = useMemo(() => me?.pacts ?? [], [me?.pacts])
@@ -105,66 +107,24 @@ export function CommandCenter() {
     [insights.needsAttention],
   )
 
-  const headlineValue = insights.totalValue[0]
   const upcomingPayments = sorted.filter(
     (p) => ['ACTIVE', 'IN_PROGRESS', 'DELIVERED'].includes(p.status) && p.milestones.some((m) => m.status !== 'PAID'),
   )
 
   return (
     <main className={cn('mx-auto w-full max-w-[34rem]', TAB_BAR_SPACER)}>
-      <header className="safe-top px-5 pb-5 pt-4">
-        <p className="text-small text-chalk-muted">{greeting()},</p>
-        <h1 className="mt-0.5 text-display text-chalk">{me?.displayName || 'there'}</h1>
+      <header className="safe-top flex items-start justify-between gap-3 px-5 pb-5 pt-4">
+        <div className="min-w-0">
+          <p className="text-small text-chalk-muted">{greeting()},</p>
+          <h1 className="mt-0.5 truncate text-display text-chalk">{me?.displayName || 'there'}</h1>
+        </div>
+        <div className="shrink-0 pt-1">
+          <WalletCapsule onSwitchRole={onSwitchRole} />
+        </div>
       </header>
 
-      {/*
-        Each tile animates itself with an explicit delay rather than through parent
-        variant orchestration. The variant version left the third and fourth tiles stuck
-        at opacity 0 — the parent had no matching `hidden` variant, so the stagger never
-        propagated past the first two. Explicit delays cannot fail that way.
-      */}
-      <section className="grid grid-cols-2 gap-2.5 px-5">
-        {[
-          <StatTile key="a" icon={FileText} label="Active" value={String(insights.activeCount)} sub="agreements running" />,
-          <StatTile
-            key="b"
-            icon={Wallet}
-            label="Total value"
-            value={headlineValue ? formatAmount(headlineValue.minor, headlineValue.currency) : '0'}
-            sub={
-              headlineValue
-                ? insights.totalValue.length > 1
-                  ? `${headlineValue.currency} · +${insights.totalValue.length - 1} more`
-                  : headlineValue.currency
-                : 'nothing running'
-            }
-          />,
-          <StatTile
-            key="c"
-            icon={CalendarClock}
-            label="Due this week"
-            value={String(insights.dueThisWeek.length)}
-            sub={insights.overdue.length > 0 ? `${insights.overdue.length} overdue` : 'on track'}
-          />,
-          <StatTile
-            key="d"
-            icon={AlertCircle}
-            label="Needs you"
-            value={String(insights.needsAttention.length)}
-            sub={insights.needsAttention.length > 0 ? insights.needsAttention[0].reason : 'nothing waiting'}
-            tone={insights.needsAttention.length > 0 ? 'alert' : 'neutral'}
-          />,
-        ].map((tile, index) => (
-          <motion.div
-            key={index}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          >
-            {tile}
-          </motion.div>
-        ))}
-      </section>
+      <RoleDashboard />
+
 
       {insights.needsAttention.length > 0 && (
         <section className="mt-7 px-5">

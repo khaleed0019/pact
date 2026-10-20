@@ -33,6 +33,8 @@ import type { Milestone, PactDetail, PactVisibility, ParticipantRole } from '@/l
 import type { UserFacingError } from '@/lib/errors'
 import { PactSeal } from '@/components/seal/PactSeal'
 import { Timeline } from '@/components/pact/Timeline'
+import { AgreementProgress } from '@/components/pact/AgreementProgress'
+import { PaymentReceipt } from '@/components/pact/PaymentReceipt'
 import { PaymentSheet, payabilityReason } from '@/components/pact/PaymentSheet'
 import { SealSheet } from '@/components/pact/SealSheet'
 import { DeliverySheet, DisputeSheet, ExplainSheet, NegotiationSheet } from '@/components/pact/ActionSheets'
@@ -364,6 +366,12 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
 
         {cannotPay && role === 'CLIENT' && <ErrorNotice error={cannotPay} className="mb-5" />}
         {error && <ErrorNotice error={error} className="mb-5" onRetry={() => void load()} />}
+
+        {/* --- where it stands ------------------------------------------------------ */}
+        <section className="mb-7">
+          <SectionTitle>Progress</SectionTitle>
+          <AgreementProgress pact={pact} />
+        </section>
 
         {/* --- terms changed after signing ----------------------------------------- */}
         {termsChange && (
@@ -766,6 +774,20 @@ export default function PactPage({ params }: { params: Promise<{ id: string }> }
                   )}
                 </div>
               ))}
+            </div>
+          </section>
+        )}
+
+        {/* --- payments ------------------------------------------------------------- */}
+        {pact.payments.length > 0 && (
+          <section className="mb-7">
+            <SectionTitle>Payments</SectionTitle>
+            <div className="space-y-2.5">
+              {[...pact.payments]
+                .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+                .map((payment) => (
+                  <PaymentReceipt key={payment.id} payment={payment} onChecked={() => void load()} />
+                ))}
             </div>
           </section>
         )}

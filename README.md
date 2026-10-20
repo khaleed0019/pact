@@ -12,7 +12,7 @@ Built for the [Nimiq Mini Apps Competition, Cycle II](https://miniappscompetitio
 
 <p align="center">
   <img src="public/brand/shots/terms-changed.png" alt="A PACT whose terms moved after both parties signed: the signed fingerprint struck through, the current one below it, and both signatures cleared." width="320">
-  <img src="public/brand/shots/earn.jpg" alt="The Earn tab: work a brand has posted, each with a fixed reward in NIM or USDT and how many spots are left." width="320">
+  <img src="public/brand/shots/earn.jpg" alt="Campaigns: work a brand has posted, each with a fixed reward in NIM or USDT and how many spots are left." width="320">
 </p>
 
 <p align="center">
@@ -64,7 +64,8 @@ takes a fee, and does not exist inside the wallet where the money already is.
     can open to check the terms, the fingerprint and both signatures — without seeing your
     delivery notes, transaction references or full wallet addresses. Anyone can also look
     up a reference directly.
-11. **Post work, or take it up (Earn).** A brand posts a campaign: a brief, requirements, a
+11. **Post work, or take it up.** Pick a role the first time you sign in — Brand or
+    Contributor — and PACT remembers it for your wallet; you can switch from your profile. A brand posts a campaign: a brief, requirements, a
     fixed reward and a number of spots. Anyone can browse; a signed-in person takes one up
     and gets **their own ordinary PACT** with the brand — same signatures, same delivery
     and review, same chain-verified payment. A campaign is only the offer; nothing after
@@ -315,13 +316,27 @@ is worse than no number at all.
 
 ---
 
+## Two-wallet run (local)
+
+```bash
+SUPABASE_URL= SUPABASE_SERVICE_ROLE_KEY= npm run dev   # in-process store, never production
+npm run e2e:local -- http://localhost:3000
+```
+
+`scripts/e2e-two-wallets.mjs` generates two Ed25519 keys and drives the real HTTP routes:
+sign-in challenge, role choice, campaign post, claim, both seals over the real terms
+digest, a revision round, approval, and a payment report checked against the live Nimiq
+network. The reported transaction is invented on purpose, so the correct result — and
+what the script asserts — is that the server **refuses to confirm it**. This is not a
+Nimiq Pay run and moves no money; a real payment still has to be made from the app.
+
 ## Tests
 
 ```bash
 npm run verify     # typecheck + honesty check + tests
 ```
 
-126 tests, no test framework dependency — Node runs the TypeScript directly.
+135 tests, no test framework dependency — Node runs the TypeScript directly.
 
 The ones worth knowing about:
 

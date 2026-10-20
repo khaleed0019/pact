@@ -25,6 +25,7 @@ import type {
   VerificationRecord,
 } from '../pact/types.ts'
 import type { PactCategory } from '../pact/categories.ts'
+import type { AppRole } from '../pact/roles.ts'
 
 /**
  * The storage contract.
@@ -203,6 +204,11 @@ export interface Repository {
 
   /** Set the display name shown to counterparties on every future pact, and on the trust profile. */
   updateProfile(address: string, displayName: string): Promise<void>
+
+  /** The product role stored for this verified address, or null if they have not chosen. */
+  getRole(address: string): Promise<AppRole | null>
+  /** Record the role. Idempotent; one profile per address, so switching never duplicates. */
+  setRole(address: string, role: AppRole): Promise<void>
 
   /**
    * Aggregate counts across the whole product.
