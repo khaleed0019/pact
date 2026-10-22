@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { BarChart3, Check, Pencil, Repeat2, ShieldCheck, X } from 'lucide-react'
 import { RoleSelect } from '@/components/screens/RoleSelect'
+import { HandleEditor } from '@/components/profile/HandleEditor'
+import { ThemeSwitch } from '@/components/ui/ThemeSwitch'
 import { ROLE_META } from '@/lib/pact/roles'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -184,6 +186,8 @@ export default function TrustPage() {
         )}
       </motion.section>
 
+      <HandleEditor onSaved={() => void refresh()} />
+
       {me?.role && (
         <section className="surface mb-4 flex items-center justify-between gap-3 px-4 py-3.5">
           <div className="min-w-0">
@@ -290,6 +294,10 @@ export default function TrustPage() {
             <BarChart3 aria-hidden className="h-3.5 w-3.5" />
             How much PACT is being used
           </Link>
+        </section>
+        <section className="mt-6">
+          <SectionTitle>Appearance</SectionTitle>
+          <ThemeSwitch />
         </section>
       </main>
       <TabBar />

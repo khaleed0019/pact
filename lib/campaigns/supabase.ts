@@ -3,14 +3,24 @@ import { createClient } from '@supabase/supabase-js'
 import { RepoError } from '../db/repo.ts'
 import { normalizeAddress } from '../nimiq/address.ts'
 import { CLAIM_BLOCKER_MESSAGE, canCampaignTransition } from './model.ts'
-import type { Campaign, CampaignClaim, CampaignStatus, ClaimBlocker } from './model.ts'
+import type {
+  Campaign,
+  CampaignCategory,
+  CampaignClaim,
+  CampaignInvitation,
+  CampaignStatus,
+  CampaignVisibility,
+  ClaimBlocker,
+  InvitationStatus,
+} from './model.ts'
 import type { CampaignStore, ClaimRecord, CreateCampaignInput } from './store.ts'
 import type { Currency, EvmChainKey } from '../pact/types.ts'
 
 type Row = Record<string, unknown>
 
 const COLUMNS =
-  'id, owner_address, owner_name, title, brief, requirements, currency, chain, reward_minor::text, slots, deadline, status, created_at, updated_at'
+  'id, owner_address, owner_name, title, brief, requirements, currency, chain, reward_minor::text, slots, deadline, status, visibility, category, submission_instructions, platform, revision_limit, created_at, updated_at'
+const INVITATION_COLUMNS = 'id, campaign_id, invitee_address, invited_by, via, status, pact_id, created_at, updated_at'
 const CLAIM_COLUMNS = 'id, campaign_id, jobber_address, pact_id, created_at'
 
 const str = (v: unknown) => (v == null ? '' : String(v))
@@ -30,6 +40,25 @@ function toCampaign(row: Row): Campaign {
     slots: Number(row.slots),
     deadline: nullable(row.deadline),
     status: str(row.status) as CampaignStatus,
+    visibility: (str(row.visibility) || 'PUBLIC') as CampaignVisibility,
+    category: (str(row.category) || 'OTHER') as CampaignCategory,
+    submissionInstructions: str(row.submission_instructions),
+    platform: str(row.platform),
+    revisionLimit: row.revision_limit == null ? null : Number(row.revision_limit),
+    createdAt: str(row.created_at),
+    updatedAt: str(row.updated_at),
+  }
+}
+
+function toInvitation(row: Row): CampaignInvitation {
+  return {
+    id: str(row.id),
+    campaignId: str(row.campaign_id),
+    inviteeAddress: str(row.invitee_address),
+    invitedBy: str(row.invited_by),
+    via: str(row.via) as 'HANDLE' | 'ADDRESS',
+    status: str(row.status) as InvitationStatus,
+    pactId: nullable(row.pact_id),
     createdAt: str(row.created_at),
     updatedAt: str(row.updated_at),
   }
@@ -98,6 +127,11 @@ export class SupabaseCampaignStore implements CampaignStore {
         reward_minor: input.rewardMinor,
         slots: input.slots,
         deadline: input.deadline,
+        visibility: input.visibility,
+        category: input.category,
+        submission_instructions: input.submissionInstructions,
+        platform: input.platform,
+        revision_limit: input.revisionLimit,
       })
       .select(COLUMNS)
       .single()
@@ -120,6 +154,7 @@ export class SupabaseCampaignStore implements CampaignStore {
       .from('campaigns')
       .select(COLUMNS)
       .eq('status', 'OPEN')
+      .eq('visibility', 'PUBLIC')
       .order('created_at', { ascending: false })
       .limit(limit)
     if (error) fail(error, 'Could not list campaigns.')
@@ -236,5 +271,96 @@ export class SupabaseCampaignStore implements CampaignStore {
 
   async getClaimByPact(pactId: string): Promise<ClaimRecord | null> {
     return (await this.claimsWhere('pact_id', [pactId]))[0] ?? null
+  }
+
+  // --- invitations --------------------------------------------------------------------
+
+  async createInvitation(input: {
+    campaignId: string
+    inviteeAddress: string
+    invitedBy: string
+    via: 'HANDLE' | 'ADDRESS'
+  }): Promise<CampaignInvitation> {
+    // The invitee may never have opened PACT; `users` is the FK target, so make sure the row exists.
+    const invitee = await this.ensureUser(input.inviteeAddress)
+    const existing = await this.findInvitation(input.campaignId, invitee)
+    if (existing) return existing
+    const { data, error } = await this.db
+      .from('campaign_invitations')
+      .insert({
+        campaign_id: input.campaignId,
+        invitee_address: invitee,
+        invited_by: normalizeAddress(input.invitedBy),
+        via: input.via,
+      })
+      .select(INVITATION_COLUMNS)
+      .single()
+    if (error || !data) {
+      // A concurrent send for the same person: return theirs rather than failing.
+      const raced = await this.findInvitation(input.campaignId, invitee)
+      if (raced) return raced
+      fail(error, 'Could not send that invitation.')
+    }
+    return toInvitation(data as Row)
+  }
+
+  async getInvitation(id: string): Promise<CampaignInvitation | null> {
+    const { data, error } = await this.db.from('campaign_invitations').select(INVITATION_COLUMNS).eq('id', id).maybeSingle()
+    if (error) {
+      if (error.code === '22P02') return null
+      fail(error, 'Could not load that invitation.')
+    }
+    return data ? toInvitation(data as Row) : null
+  }
+
+  async listInvitationsForCampaign(campaignId: string): Promise<CampaignInvitation[]> {
+    const { data, error } = await this.db
+      .from('campaign_invitations')
+      .select(INVITATION_COLUMNS)
+      .eq('campaign_id', campaignId)
+      .order('created_at', { ascending: true })
+    if (error) fail(error, 'Could not load invitations.')
+    return (data ?? []).map((r) => toInvitation(r as Row))
+  }
+
+  async listInvitationsForInvitee(address: string): Promise<CampaignInvitation[]> {
+    const { data, error } = await this.db
+      .from('campaign_invitations')
+      .select(INVITATION_COLUMNS)
+      .eq('invitee_address', normalizeAddress(address))
+      .order('created_at', { ascending: false })
+    if (error) fail(error, 'Could not load invitations.')
+    return (data ?? []).map((r) => toInvitation(r as Row))
+  }
+
+  async findInvitation(campaignId: string, address: string): Promise<CampaignInvitation | null> {
+    const { data, error } = await this.db
+      .from('campaign_invitations')
+      .select(INVITATION_COLUMNS)
+      .eq('campaign_id', campaignId)
+      .eq('invitee_address', normalizeAddress(address))
+      .maybeSingle()
+    if (error) fail(error, 'Could not load that invitation.')
+    return data ? toInvitation(data as Row) : null
+  }
+
+  async setInvitationStatus(
+    id: string,
+    from: InvitationStatus,
+    to: InvitationStatus,
+    pactId?: string | null,
+  ): Promise<CampaignInvitation | null> {
+    const patch: Row = { status: to }
+    if (pactId !== undefined) patch.pact_id = pactId
+    // Compare-and-set on the current status: if two requests race, only one row update matches.
+    const { data, error } = await this.db
+      .from('campaign_invitations')
+      .update(patch)
+      .eq('id', id)
+      .eq('status', from)
+      .select(INVITATION_COLUMNS)
+      .maybeSingle()
+    if (error) fail(error, 'Could not update that invitation.')
+    return data ? toInvitation(data as Row) : null
   }
 }

@@ -8,6 +8,7 @@ import { useSession } from '@/lib/client/session'
 import { shortenAddress as shortAddress } from '@/lib/nimiq/address'
 import { ROLE_META } from '@/lib/pact/roles'
 import { cn } from '@/lib/cn'
+import { ThemeSwitch } from '@/components/ui/ThemeSwitch'
 
 /**
  * The wallet capsule: who you are signed in as, and in which role.
@@ -75,7 +76,7 @@ export function WalletCapsule({ onSwitchRole }: { onSwitchRole: () => void }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-            className="glass-strong absolute right-0 top-[calc(100%+0.5rem)] z-50 w-60 origin-top-right rounded-card p-1.5"
+            className="glass-strong absolute right-0 top-[calc(100%+0.5rem)] z-50 w-64 origin-top-right rounded-card p-1.5"
           >
             <div className="px-3 py-2.5">
               <p className="text-[0.65rem] uppercase tracking-wider text-chalk-faint">
@@ -105,6 +106,11 @@ export function WalletCapsule({ onSwitchRole }: { onSwitchRole: () => void }) {
               <Repeat2 aria-hidden className="h-4 w-4 text-chalk-faint" />
               {role ? `Switch from ${role}` : 'Choose a role'}
             </button>
+            <div className="px-1.5 py-1.5">
+              <p className="mb-1.5 px-1.5 text-[0.65rem] uppercase tracking-wider text-chalk-faint">Appearance</p>
+              <ThemeSwitch />
+            </div>
+            <div className="my-1 h-px bg-white/[0.07]" />
             <button
               role="menuitem"
               type="button"

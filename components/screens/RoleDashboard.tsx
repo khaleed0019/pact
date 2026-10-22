@@ -95,6 +95,44 @@ function Contributor({ d }: { d: ContributorDashboard }) {
   const due = d.nextDeadline ? relativeDeadline(d.nextDeadline.deadline) : null
   return (
     <section className="px-5" aria-label="Contributor dashboard">
+      {d.invitations.length > 0 && (
+        <div className="mb-5">
+          <SectionTitle
+            action={
+              <Link href="/campaigns" className="text-[0.7rem] font-medium text-chalk-muted underline underline-offset-4">
+                View all
+              </Link>
+            }
+          >
+            Invitations for you
+          </SectionTitle>
+          <ul className="space-y-2.5">
+            {d.invitations.slice(0, 3).map((inv) => (
+              <li key={inv.invitationId}>
+                <Link
+                  href={`/campaigns/${inv.campaignId}`}
+                  className="surface focus-ring flex items-center gap-3 border-gold/25 px-4 py-3.5 active:bg-white/[0.04]"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[0.7rem] text-chalk-faint">
+                      {inv.ownerName}
+                      {inv.visibility === 'PRIVATE' ? ' · only for you' : ''}
+                    </p>
+                    <p className="truncate text-small font-semibold text-chalk">{inv.title}</p>
+                    <p className="tabular mt-0.5 text-small font-semibold text-gold-bright">
+                      {formatWithCurrency(inv.rewardMinor, inv.currency)}
+                      {inv.deadline && (
+                        <span className="ml-2 text-[0.7rem] font-normal text-chalk-muted">{relativeDeadline(inv.deadline).label}</span>
+                      )}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-pill bg-sun px-2.5 py-1 text-[0.7rem] font-semibold text-onsun">Review</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {d.activeWork === 0 && d.openOpportunities > 0 ? (
         <StartCard
           title={`${d.openOpportunities} paid ${d.openOpportunities === 1 ? 'campaign is' : 'campaigns are'} open`}

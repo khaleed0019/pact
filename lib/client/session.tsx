@@ -21,6 +21,7 @@ export interface MeResponse {
   address?: string
   displayName?: string
   role?: AppRole | null
+  handle?: string | null
   demo?: boolean
   pacts?: Pact[]
   trust?: TrustMetrics

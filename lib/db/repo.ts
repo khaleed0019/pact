@@ -26,6 +26,7 @@ import type {
 } from '../pact/types.ts'
 import type { PactCategory } from '../pact/categories.ts'
 import type { AppRole } from '../pact/roles.ts'
+import type { PublicProfile } from '../pact/handles.ts'
 
 /**
  * The storage contract.
@@ -209,6 +210,20 @@ export interface Repository {
   getRole(address: string): Promise<AppRole | null>
   /** Record the role. Idempotent; one profile per address, so switching never duplicates. */
   setRole(address: string, role: AppRole): Promise<void>
+
+  /** Handle, categories and links for an address (name falls back like trust metrics). */
+  getProfile(address: string): Promise<PublicProfile>
+  /**
+   * Set the caller's own handle/categories/links. The handle must already be validated
+   * and normalized; a taken handle throws CONFLICT. `handle: null` clears it.
+   */
+  updateProfileDetails(
+    address: string,
+    patch: { handle?: string | null; categories?: string[]; links?: string[] },
+  ): Promise<PublicProfile>
+  findProfileByHandle(handle: string): Promise<PublicProfile | null>
+  /** Handles starting with `prefix`, for the invite picker. */
+  searchProfiles(prefix: string, limit: number): Promise<PublicProfile[]>
 
   /**
    * Aggregate counts across the whole product.

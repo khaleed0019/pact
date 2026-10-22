@@ -65,7 +65,7 @@ export function TabBar() {
             <Link
               href={centre.href}
               aria-label={centre.label}
-              className="focus-ring flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-b from-gold-bright to-gold text-ink-950 shadow-glow-gold transition-transform duration-150 active:scale-95"
+              className="focus-ring flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-b from-sun-light to-sun text-onsun shadow-glow-gold transition-transform duration-150 active:scale-95"
             >
               <Plus aria-hidden className="h-6 w-6" strokeWidth={2.5} />
             </Link>
@@ -96,14 +96,14 @@ export function TabBar() {
               >
                 {tab.label}
                 {tab.href === '/activity' && unread > 0 && (
-                  <span className="tabular ml-1.5 rounded-full bg-rose px-1.5 text-[0.6rem] font-semibold text-white">{unread}</span>
+                  <span className="tabular ml-1.5 rounded-full bg-rose px-1.5 text-[0.6rem] font-semibold text-[#fff]">{unread}</span>
                 )}
                 {active && <span aria-hidden className="absolute inset-x-3 -bottom-[0.6rem] h-0.5 rounded-full bg-gold" />}
               </Link>
             )
           })}
           <Link href={centre.href} className="ml-auto">
-            <span className="focus-ring inline-flex h-9 items-center gap-1.5 rounded-xl bg-gradient-to-b from-gold-bright to-gold px-3.5 text-small font-semibold text-ink-950">
+            <span className="focus-ring inline-flex h-9 items-center gap-1.5 rounded-xl bg-gradient-to-b from-sun-light to-sun px-3.5 text-small font-semibold text-onsun">
               <Plus aria-hidden className="h-4 w-4" strokeWidth={2.5} />
               {centre.label}
             </span>
@@ -135,7 +135,7 @@ function TabLink({ tab, active, badge, animate }: { tab: Tab; active: boolean; b
         {badge > 0 && (
           <span
             aria-hidden
-            className="tabular absolute -right-1.5 -top-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-rose px-1 text-[0.55rem] font-semibold text-white"
+            className="tabular absolute -right-1.5 -top-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-rose px-1 text-[0.55rem] font-semibold text-[#fff]"
           >
             {badge > 9 ? '9+' : badge}
           </span>

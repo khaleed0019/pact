@@ -64,6 +64,13 @@ takes a fee, and does not exist inside the wallet where the money already is.
     can open to check the terms, the fingerprint and both signatures — without seeing your
     delivery notes, transaction references or full wallet addresses. Anyone can also look
     up a reference directly.
+12. **Public or invite-only campaigns.** A brand can list work for anyone, or keep a
+    campaign private and invite specific people by Pact handle (`@name`) or exact Nimiq
+    address. A private campaign never appears in the marketplace and returns "not found"
+    to anyone not invited. An invitation is bound to one wallet; accepting it creates the
+    agreement but signs nothing — both sides still sign the exact terms.
+13. **Light and dark.** Follows the phone by default, with an Auto / Light / Dark switch
+    in the account menu and profile.
 11. **Post work, or take it up.** Pick a role the first time you sign in — Brand or
     Contributor — and PACT remembers it for your wallet; you can switch from your profile. A brand posts a campaign: a brief, requirements, a
     fixed reward and a number of spots. Anyone can browse; a signed-in person takes one up

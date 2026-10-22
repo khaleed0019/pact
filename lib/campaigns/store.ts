@@ -1,4 +1,12 @@
-import type { Campaign, CampaignClaim, CampaignStatus } from './model.ts'
+import type {
+  Campaign,
+  CampaignCategory,
+  CampaignClaim,
+  CampaignInvitation,
+  CampaignStatus,
+  CampaignVisibility,
+  InvitationStatus,
+} from './model.ts'
 import type { Currency, EvmChainKey } from '../pact/types.ts'
 
 /** A claim plus the status of the agreement made from it, which decides whether it still holds a slot. */
@@ -17,6 +25,11 @@ export interface CreateCampaignInput {
   rewardMinor: string
   slots: number
   deadline: string | null
+  visibility: CampaignVisibility
+  category: CampaignCategory
+  submissionInstructions: string
+  platform: string
+  revisionLimit: number | null
 }
 
 /**
@@ -30,7 +43,7 @@ export interface CreateCampaignInput {
 export interface CampaignStore {
   createCampaign(input: CreateCampaignInput): Promise<Campaign>
   getCampaign(id: string): Promise<Campaign | null>
-  /** OPEN campaigns, newest first. */
+  /** OPEN **PUBLIC** campaigns, newest first. Private campaigns are never listed. */
   listOpen(limit: number): Promise<Campaign[]>
   listByOwner(address: string): Promise<Campaign[]>
   setStatus(id: string, status: CampaignStatus): Promise<Campaign>
@@ -48,4 +61,22 @@ export interface CampaignStore {
   listClaimsForCampaigns(campaignIds: string[]): Promise<ClaimRecord[]>
   listClaimsForJobber(address: string): Promise<Array<ClaimRecord & { campaign: Campaign }>>
   getClaimByPact(pactId: string): Promise<ClaimRecord | null>
+
+  // --- invitations --------------------------------------------------------------------
+  /** One invitation per (campaign, address); a repeat returns the existing row. */
+  createInvitation(input: {
+    campaignId: string
+    inviteeAddress: string
+    invitedBy: string
+    via: 'HANDLE' | 'ADDRESS'
+  }): Promise<CampaignInvitation>
+  getInvitation(id: string): Promise<CampaignInvitation | null>
+  listInvitationsForCampaign(campaignId: string): Promise<CampaignInvitation[]>
+  listInvitationsForInvitee(address: string): Promise<CampaignInvitation[]>
+  findInvitation(campaignId: string, address: string): Promise<CampaignInvitation | null>
+  /**
+   * Compare-and-set: moves the invitation only if it is still `from`. Returns null when it
+   * had already changed, so two taps on Accept cannot both win.
+   */
+  setInvitationStatus(id: string, from: InvitationStatus, to: InvitationStatus, pactId?: string | null): Promise<CampaignInvitation | null>
 }

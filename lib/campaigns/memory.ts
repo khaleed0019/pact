@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { RepoError } from '../db/repo.ts'
 import { normalizeAddress } from '../nimiq/address.ts'
 import { CLAIM_BLOCKER_MESSAGE, SLOT_RELEASING, canCampaignTransition, claimBlocker } from './model.ts'
-import type { Campaign, CampaignClaim, CampaignStatus } from './model.ts'
+import type { Campaign, CampaignClaim, CampaignInvitation, CampaignStatus, InvitationStatus } from './model.ts'
 import type { CampaignStore, ClaimRecord, CreateCampaignInput } from './store.ts'
 
 const now = () => new Date().toISOString()
@@ -17,6 +17,7 @@ const now = () => new Date().toISOString()
 export class MemoryCampaignStore implements CampaignStore {
   private campaigns = new Map<string, Campaign>()
   private claims = new Map<string, CampaignClaim>()
+  private invitations = new Map<string, CampaignInvitation>()
 
   private readonly pactStatusOf: (pactId: string) => Promise<string | null>
 
@@ -44,7 +45,7 @@ export class MemoryCampaignStore implements CampaignStore {
 
   async listOpen(limit: number): Promise<Campaign[]> {
     return [...this.campaigns.values()]
-      .filter((c) => c.status === 'OPEN')
+      .filter((c) => c.status === 'OPEN' && c.visibility === 'PUBLIC')
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, limit)
   }
@@ -149,5 +150,65 @@ export class MemoryCampaignStore implements CampaignStore {
   async getClaimByPact(pactId: string): Promise<ClaimRecord | null> {
     const claim = [...this.claims.values()].find((c) => c.pactId === pactId)
     return claim ? this.withStatus(claim) : null
+  }
+
+  async createInvitation(input: {
+    campaignId: string
+    inviteeAddress: string
+    invitedBy: string
+    via: 'HANDLE' | 'ADDRESS'
+  }): Promise<CampaignInvitation> {
+    const invitee = normalizeAddress(input.inviteeAddress)
+    const existing = await this.findInvitation(input.campaignId, invitee)
+    if (existing) return existing
+    const timestamp = now()
+    const invitation: CampaignInvitation = {
+      id: randomUUID(),
+      campaignId: input.campaignId,
+      inviteeAddress: invitee,
+      invitedBy: normalizeAddress(input.invitedBy),
+      via: input.via,
+      status: 'PENDING',
+      pactId: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }
+    this.invitations.set(invitation.id, invitation)
+    return invitation
+  }
+
+  async getInvitation(id: string): Promise<CampaignInvitation | null> {
+    return this.invitations.get(id) ?? null
+  }
+
+  async listInvitationsForCampaign(campaignId: string): Promise<CampaignInvitation[]> {
+    return [...this.invitations.values()]
+      .filter((i) => i.campaignId === campaignId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  }
+
+  async listInvitationsForInvitee(address: string): Promise<CampaignInvitation[]> {
+    const who = normalizeAddress(address)
+    return [...this.invitations.values()]
+      .filter((i) => i.inviteeAddress === who)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  }
+
+  async findInvitation(campaignId: string, address: string): Promise<CampaignInvitation | null> {
+    const who = normalizeAddress(address)
+    return [...this.invitations.values()].find((i) => i.campaignId === campaignId && i.inviteeAddress === who) ?? null
+  }
+
+  async setInvitationStatus(
+    id: string,
+    from: InvitationStatus,
+    to: InvitationStatus,
+    pactId?: string | null,
+  ): Promise<CampaignInvitation | null> {
+    const current = this.invitations.get(id)
+    if (!current || current.status !== from) return null
+    const next = { ...current, status: to, pactId: pactId === undefined ? current.pactId : pactId, updatedAt: now() }
+    this.invitations.set(id, next)
+    return next
   }
 }

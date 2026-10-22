@@ -45,8 +45,21 @@ export interface BrandDashboard {
   awaitingSignature: ActionItem[]
 }
 
+export interface InvitationItem {
+  invitationId: string
+  campaignId: string
+  title: string
+  ownerName: string
+  brief: string
+  rewardMinor: string
+  currency: Currency
+  deadline: string | null
+  visibility: 'PUBLIC' | 'PRIVATE'
+}
+
 export interface ContributorDashboard {
   role: 'CONTRIBUTOR'
+  invitations: InvitationItem[]
   openOpportunities: number
   activeWork: number
   nextDeadline: { pactId: string; title: string; deadline: string } | null
@@ -103,11 +116,29 @@ export async function contributorDashboard(
   address: string,
 ): Promise<ContributorDashboard> {
   const me = normalizeAddress(address)
-  const [open, claims, pacts] = await Promise.all([
+  const [open, claims, pacts, invitationRows] = await Promise.all([
     store.listOpen(200),
     store.listClaimsForJobber(me),
     repo.listPactsForAddress(me),
+    store.listInvitationsForInvitee(me),
   ])
+
+  const invitations: InvitationItem[] = []
+  for (const invitation of invitationRows.filter((i) => i.status === 'PENDING')) {
+    const c = await store.getCampaign(invitation.campaignId)
+    if (!c || (c.status !== 'OPEN' && c.status !== 'PAUSED')) continue
+    invitations.push({
+      invitationId: invitation.id,
+      campaignId: c.id,
+      title: c.title,
+      ownerName: c.ownerName,
+      brief: c.brief,
+      rewardMinor: c.rewardMinor,
+      currency: c.currency,
+      deadline: c.deadline,
+      visibility: c.visibility,
+    })
+  }
 
   const claimedIds = new Set(claims.map((c) => c.campaignId))
   const openRecords = await store.listClaimsForCampaigns(open.map((c) => c.id))
@@ -122,6 +153,7 @@ export async function contributorDashboard(
 
   const out: ContributorDashboard = {
     role: 'CONTRIBUTOR',
+    invitations,
     openOpportunities,
     activeWork: 0,
     nextDeadline: null,

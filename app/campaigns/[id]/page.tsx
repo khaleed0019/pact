@@ -3,12 +3,15 @@
 import { use, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Lock, Mail } from 'lucide-react'
 import { api, toUserFacing } from '@/lib/client/api'
 import { useSession } from '@/lib/client/session'
 import { formatWithCurrency } from '@/lib/pact/money'
 import { formatLongDate, relativeDeadline } from '@/lib/format'
-import { CLAIM_BLOCKER_MESSAGE } from '@/lib/campaigns/model'
+import { CATEGORY_LABEL, CLAIM_BLOCKER_MESSAGE, type CampaignInvitation } from '@/lib/campaigns/model'
+import { InvitePicker, toTarget, type Invitee } from '@/components/campaigns/InvitePicker'
+import { shortenAddress } from '@/lib/nimiq/address'
+import { cn } from '@/lib/cn'
 import { termsFromCampaign } from '@/lib/campaigns/service'
 import { EVM_CHAINS } from '@/lib/pact/types'
 import type { BudgetSummary, Campaign, ClaimBlocker } from '@/lib/campaigns/model'
@@ -18,9 +21,28 @@ import { Button } from '@/components/ui/Button'
 import { ErrorNotice, Money, SectionTitle, Skeleton, StatusPill } from '@/components/ui/Bits'
 import type { UserFacingError } from '@/lib/errors'
 
+interface OwnerInvitation {
+  invitation: CampaignInvitation
+  handle: string | null
+  displayName: string
+}
+
 type Detail =
-  | { viewer: 'OWNER'; campaign: Campaign; budget: BudgetSummary; claims: ClaimOverview[] }
-  | { viewer: 'JOBBER' | 'GUEST'; campaign: Campaign; budget: BudgetSummary; blocker: ClaimBlocker | null; myPactId: string | null }
+  | {
+      viewer: 'OWNER'
+      campaign: Campaign
+      budget: BudgetSummary
+      claims: ClaimOverview[]
+      invitations: OwnerInvitation[]
+    }
+  | {
+      viewer: 'JOBBER' | 'GUEST'
+      campaign: Campaign
+      budget: BudgetSummary
+      blocker: ClaimBlocker | null
+      myPactId: string | null
+      myInvitation: CampaignInvitation | null
+    }
 
 /**
  * One campaign. Three audiences, one URL:
@@ -68,6 +90,28 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
     }
   }
 
+  /** Accept or decline the invitation addressed to this wallet. Accepting creates the unsigned agreement. */
+  const answer = async (invitationId: string, verb: 'accept' | 'decline') => {
+    setBusy(true)
+    setError(null)
+    try {
+      if (verb === 'accept') {
+        const result = await api<{ pactId: string }>(`/api/invitations/${invitationId}/accept`, {
+          method: 'POST',
+          body: { name: (name || me?.displayName || '').trim() },
+        })
+        router.push(`/p/${result.pactId}`)
+        return
+      }
+      await api(`/api/invitations/${invitationId}/decline`, { method: 'POST' })
+      router.push('/campaigns')
+    } catch (cause) {
+      setError(toUserFacing(cause))
+      setBusy(false)
+      void load()
+    }
+  }
+
   const setStatus = async (status: Campaign['status']) => {
     setBusy(true)
     try {
@@ -101,6 +145,18 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
       {detail && campaign && (
         <div className="space-y-6">
           <section className="surface px-4 py-4">
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+              <span className="rounded-pill bg-white/[0.06] px-2 py-0.5 text-[0.65rem] text-chalk-muted">{CATEGORY_LABEL[campaign.category]}</span>
+              {campaign.visibility === 'PRIVATE' && (
+                <span className="inline-flex items-center gap-1 rounded-pill bg-azure/10 px-2 py-0.5 text-[0.65rem] text-azure-bright">
+                  <Lock aria-hidden className="h-3 w-3" />
+                  Invite only
+                </span>
+              )}
+              {campaign.platform && (
+                <span className="rounded-pill bg-white/[0.06] px-2 py-0.5 text-[0.65rem] text-chalk-muted">{campaign.platform}</span>
+              )}
+            </div>
             <h2 className="text-balance text-title text-chalk">{campaign.title}</h2>
             <p className="mt-1 text-small text-chalk-muted">From {campaign.ownerName}</p>
             <div className="mt-2 flex items-baseline justify-between gap-3">
@@ -125,6 +181,14 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
                 ))}
               </ul>
             )}
+            {(campaign.submissionInstructions || campaign.revisionLimit !== null) && (
+              <dl className="surface mt-4 divide-y divide-white/[0.06]">
+                {campaign.submissionInstructions && <Line label="How to submit" value={campaign.submissionInstructions} />}
+                {campaign.revisionLimit !== null && (
+                  <Line label="Revision rounds" value={campaign.revisionLimit === 0 ? 'None included' : String(campaign.revisionLimit)} />
+                )}
+              </dl>
+            )}
           </section>
 
           {detail.viewer !== 'OWNER' && (
@@ -141,6 +205,17 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
                     Sign in to take this up
                   </Button>
                 </Link>
+              ) : detail.myInvitation?.status === 'PENDING' ? (
+                <InvitationAnswer
+                  campaign={campaign}
+                  isContributor={me?.role === 'CONTRIBUTOR'}
+                  needsName={!me?.displayName}
+                  name={name}
+                  onName={setName}
+                  busy={busy}
+                  onAccept={() => void answer(detail.myInvitation!.id, 'accept')}
+                  onDecline={() => void answer(detail.myInvitation!.id, 'decline')}
+                />
               ) : me?.role !== 'CONTRIBUTOR' ? (
                 <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3">
                   <p className="text-small text-chalk-muted">
@@ -196,6 +271,8 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
                   only once it’s confirmed on the network.
                 </p>
               </section>
+
+              <OwnerInvitations campaignId={campaign.id} invitations={detail.invitations} onChanged={() => void load()} />
 
               <section>
                 <SectionTitle>People</SectionTitle>
@@ -359,6 +436,16 @@ function AgreementPreview({ campaign }: { campaign: Campaign }) {
           <p className="text-[0.7rem] font-medium text-chalk-faint">When you’re paid</p>
           <p className="mt-1 text-small text-chalk">{terms.paymentCondition}</p>
         </div>
+        {terms.specialTerms.length > 0 && (
+          <div>
+            <p className="text-[0.7rem] font-medium text-chalk-faint">Also agreed</p>
+            <ul className="mt-1 space-y-0.5 text-small text-chalk">
+              {terms.specialTerms.map((t) => (
+                <li key={t}>{t}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <ul className="space-y-1 text-[0.7rem] leading-relaxed text-chalk-muted">
           <li>· Nothing is binding until you and the brand have both signed it with your wallets.</li>
           <li>· The brand can approve your work or ask for changes, with a reason.</li>
@@ -388,4 +475,154 @@ function nextStep(c: ClaimOverview): string {
   if (c.pactStatus === 'DELIVERED') return 'Approved — ready to pay'
   if (!c.sealed) return 'Waiting for both signatures'
   return 'In progress'
+}
+
+/**
+ * The invitee's answer. Shows the exact agreement first, then Accept or Decline. Accepting
+ * creates the agreement; it does not sign it — the contributor signs on the next screen,
+ * and the brand signs too.
+ */
+function InvitationAnswer({
+  campaign,
+  isContributor,
+  needsName,
+  name,
+  onName,
+  busy,
+  onAccept,
+  onDecline,
+}: {
+  campaign: Campaign
+  isContributor: boolean
+  needsName: boolean
+  name: string
+  onName: (v: string) => void
+  busy: boolean
+  onAccept: () => void
+  onDecline: () => void
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="glass flex items-start gap-3 rounded-card px-4 py-3">
+        <Mail aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-gold-bright" />
+        <p className="text-small text-chalk">
+          {campaign.ownerName} invited you to this {campaign.visibility === 'PRIVATE' ? 'invite-only ' : ''}campaign. Read the
+          agreement below before you answer.
+        </p>
+      </div>
+      <AgreementPreview campaign={campaign} />
+      {!isContributor ? (
+        <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3">
+          <p className="text-small text-chalk-muted">To accept work you need to be using PACT as a contributor.</p>
+          <Link href="/trust" className="mt-1.5 inline-block text-small font-medium text-gold-bright underline underline-offset-4">
+            Switch in your profile
+          </Link>
+        </div>
+      ) : (
+        <>
+          {needsName && (
+            <input
+              value={name}
+              onChange={(e) => onName(e.target.value)}
+              placeholder="Your name, as the brand will see it"
+              aria-label="Your name"
+              maxLength={80}
+              className="focus-ring min-h-tap w-full rounded-xl border border-white/[0.09] bg-black/25 px-3.5 py-3 text-body text-chalk placeholder:text-chalk-faint"
+            />
+          )}
+          <Button size="lg" fullWidth busy={busy} disabled={needsName && !name} onClick={onAccept}>
+            Accept — you’ll sign next
+          </Button>
+        </>
+      )}
+      <Button variant="ghost" fullWidth disabled={busy} onClick={onDecline}>
+        Decline invitation
+      </Button>
+    </div>
+  )
+}
+
+const INVITE_LABEL: Record<CampaignInvitation['status'], { text: string; tone: string }> = {
+  PENDING: { text: 'Waiting for an answer', tone: 'text-amber' },
+  ACCEPTED: { text: 'Accepted', tone: 'text-jade' },
+  DECLINED: { text: 'Declined', tone: 'text-chalk-muted' },
+  REVOKED: { text: 'Withdrawn', tone: 'text-chalk-faint' },
+}
+
+/** The owner's view of who was invited, what they said, and a way to invite more. */
+function OwnerInvitations({
+  campaignId,
+  invitations,
+  onChanged,
+}: {
+  campaignId: string
+  invitations: OwnerInvitation[]
+  onChanged: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<UserFacingError | null>(null)
+
+  const invite = async (invitee: Invitee) => {
+    setBusy(true)
+    setError(null)
+    try {
+      await api(`/api/campaigns/${campaignId}/invitations`, { method: 'POST', body: toTarget(invitee) })
+      onChanged()
+    } catch (cause) {
+      setError(toUserFacing(cause))
+    }
+    setBusy(false)
+  }
+
+  const revoke = async (id: string) => {
+    setBusy(true)
+    try {
+      await api(`/api/invitations/${id}/revoke`, { method: 'POST' })
+      onChanged()
+    } catch (cause) {
+      setError(toUserFacing(cause))
+    }
+    setBusy(false)
+  }
+
+  return (
+    <section>
+      <SectionTitle>Invitations</SectionTitle>
+      {invitations.length > 0 && (
+        <ul className="surface mb-3 divide-y divide-white/[0.06] overflow-hidden">
+          {invitations.map(({ invitation, handle, displayName }) => (
+            <li key={invitation.id} className="flex items-center gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-small font-semibold text-chalk">{handle ? `@${handle}` : displayName}</p>
+                <p className="truncate font-mono text-[0.68rem] text-chalk-faint">{shortenAddress(invitation.inviteeAddress)}</p>
+              </div>
+              <span className={cn('shrink-0 text-[0.7rem] font-medium', INVITE_LABEL[invitation.status].tone)}>
+                {INVITE_LABEL[invitation.status].text}
+              </span>
+              {invitation.status === 'PENDING' && (
+                <button
+                  type="button"
+                  onClick={() => void revoke(invitation.id)}
+                  disabled={busy}
+                  className="focus-ring shrink-0 rounded-lg px-2 py-1 text-[0.7rem] text-chalk-muted underline underline-offset-4"
+                >
+                  Withdraw
+                </button>
+              )}
+              {invitation.pactId && (
+                <Link href={`/p/${invitation.pactId}`} className="focus-ring shrink-0 text-[0.7rem] font-medium text-gold-bright underline underline-offset-4">
+                  Agreement
+                </Link>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <InvitePicker chosen={[]} onAdd={(i) => void invite(i)} busy={busy} />
+      {error && <ErrorNotice error={error} className="mt-2" />}
+      <p className="mt-2 px-1 text-[0.7rem] leading-relaxed text-chalk-faint">
+        An invitation goes to one wallet. It signs nothing: if they accept, you both still sign the agreement.
+      </p>
+    </section>
+  )
 }

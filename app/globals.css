@@ -12,10 +12,81 @@
  */
 
 @layer base {
+  /*
+   * Theme tokens, as "r g b" channels (see tailwind.config.ts).
+   *
+   * Dark is the original PACT palette, unchanged. Light keeps the same identity — gold and
+   * blue accents, the same hierarchy — on soft off-white surfaces, with the accent *text*
+   * colours darkened until they read clearly on white. Accent *fills* (primary buttons)
+   * stay the same gold in both themes via the fixed `sun` tokens.
+   *
+   * The theme is chosen before first paint by the script in app/layout.tsx: the saved
+   * choice if there is one, otherwise the device setting.
+   */
   :root {
     color-scheme: dark;
     /* Real viewport height, so a pinned footer is not hidden behind mobile browser chrome. */
     --app-height: 100dvh;
+
+    --ink-950: 7 8 10;
+    --ink-900: 11 13 16;
+    --ink-850: 17 20 25;
+    --ink-800: 23 27 33;
+    --ink-700: 31 36 44;
+    --ink-600: 43 49 59;
+    --chalk: 244 246 248;
+    --chalk-muted: 154 164 178;
+    --chalk-faint: 100 110 126;
+    --gold: 233 178 19;
+    --gold-bright: 247 201 72;
+    --gold-deep: 184 136 10;
+    --azure: 5 130 202;
+    --azure-bright: 58 166 228;
+    --azure-deep: 4 97 143;
+    --jade: 63 169 142;
+    --amber: 224 145 47;
+    --rose: 220 76 70;
+    --violet: 139 123 232;
+    --tint: 255 255 255;
+    --shade: 0 0 0;
+
+    --shadow-card: 0 1px 0 0 rgba(255, 255, 255, 0.045) inset, 0 8px 24px -12px rgba(0, 0, 0, 0.75);
+    --shadow-lift: 0 1px 0 0 rgba(255, 255, 255, 0.06) inset, 0 20px 48px -20px rgba(0, 0, 0, 0.9);
+    --shadow-sheet: 0 -8px 48px -12px rgba(0, 0, 0, 0.85);
+    --wash-gold: rgba(233, 178, 19, 0.07);
+    --wash-blue: rgba(5, 130, 202, 0.05);
+  }
+
+  :root[data-theme='light'] {
+    color-scheme: light;
+
+    --ink-950: 236 238 242;
+    --ink-900: 245 246 248;
+    --ink-850: 255 255 255;
+    --ink-800: 241 243 246;
+    --ink-700: 230 233 238;
+    --ink-600: 213 218 225;
+    --chalk: 17 22 28;
+    --chalk-muted: 75 85 99;
+    --chalk-faint: 102 112 128;
+    --gold: 233 178 19;
+    --gold-bright: 146 104 0;
+    --gold-deep: 120 86 0;
+    --azure: 3 105 161;
+    --azure-bright: 3 105 161;
+    --azure-deep: 7 89 133;
+    --jade: 17 122 95;
+    --amber: 180 83 9;
+    --rose: 190 38 38;
+    --violet: 99 82 200;
+    --tint: 17 22 28;
+    --shade: 255 255 255;
+
+    --shadow-card: 0 1px 0 0 rgba(255, 255, 255, 0.9) inset, 0 1px 2px rgba(15, 23, 42, 0.06), 0 8px 24px -14px rgba(15, 23, 42, 0.18);
+    --shadow-lift: 0 1px 0 0 rgba(255, 255, 255, 0.9) inset, 0 20px 48px -22px rgba(15, 23, 42, 0.28);
+    --shadow-sheet: 0 -8px 40px -14px rgba(15, 23, 42, 0.22);
+    --wash-gold: rgba(233, 178, 19, 0.1);
+    --wash-blue: rgba(5, 130, 202, 0.06);
   }
 
   html {
@@ -28,8 +99,8 @@
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11'; /* clearer a, g, l, 1 at small sizes */
     /* A very slow radial wash keeps the canvas from reading as flat black. */
     background-image:
-      radial-gradient(120% 80% at 50% -20%, rgba(233, 178, 19, 0.07), transparent 60%),
-      radial-gradient(80% 60% at 100% 0%, rgba(5, 130, 202, 0.05), transparent 55%);
+      radial-gradient(120% 80% at 50% -20%, var(--wash-gold), transparent 60%),
+      radial-gradient(80% 60% at 100% 0%, var(--wash-blue), transparent 55%);
     background-attachment: fixed;
     overscroll-behavior-y: none; /* no rubber-band revealing the host app behind us */
   }
@@ -47,7 +118,7 @@
   /* A visible, high-contrast focus ring — keyboard and switch-control users need it,
      and it must not be the browser default hairline on a dark surface. */
   :focus-visible {
-    outline: 2px solid theme('colors.gold.bright');
+    outline: 2px solid rgb(var(--gold-bright));
     outline-offset: 2px;
     border-radius: 4px;
   }
@@ -87,7 +158,7 @@
   .skeleton::after {
     content: '';
     @apply absolute inset-0 -translate-x-full animate-shimmer;
-    background-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+    background-image: linear-gradient(90deg, transparent, rgb(var(--tint) / 0.06), transparent);
   }
 
   /* Horizontally scrollable regions (tables, chip rows) keep their own scrollbar
@@ -434,6 +505,29 @@
   }
 }
 
+/* Light-theme glass: frosted white with a dark hairline instead of a light rim. */
+:root[data-theme='light'] .glass {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.62));
+  border-color: rgba(17, 22, 28, 0.08);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.9),
+    0 12px 36px -18px rgba(15, 23, 42, 0.25);
+}
+:root[data-theme='light'] .glass-strong {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(246, 247, 249, 0.9));
+  border-color: rgba(17, 22, 28, 0.08);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.95),
+    0 18px 44px -20px rgba(15, 23, 42, 0.3);
+}
+:root[data-theme='light'] .glass-selected {
+  border-color: rgba(184, 136, 10, 0.6);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.95),
+    0 0 0 1px rgba(233, 178, 19, 0.3),
+    0 18px 44px -20px rgba(233, 178, 19, 0.35);
+}
+
 /*
  * Reduced transparency. Where the platform asks for it (and where backdrop-filter is not
  * supported at all), glass falls back to an opaque raised surface so nothing becomes hard
@@ -441,8 +535,10 @@
  */
 @media (prefers-reduced-transparency: reduce) {
   .glass,
-  .glass-strong {
-    background: #171b21;
+  .glass-strong,
+  :root[data-theme='light'] .glass,
+  :root[data-theme='light'] .glass-strong {
+    background: rgb(var(--ink-800));
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -450,6 +546,6 @@
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .glass,
   .glass-strong {
-    background: #171b21;
+    background: rgb(var(--ink-800));
   }
 }

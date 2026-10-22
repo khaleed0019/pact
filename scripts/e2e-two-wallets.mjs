@@ -80,6 +80,59 @@ check('choosing a role is saved', (await brand.call('/api/me/role', 'PATCH', { r
 await worker.call('/api/me/role', 'PATCH', { role: 'CONTRIBUTOR' })
 check('the role is restored on the next visit', (await brand.call('/api/me')).body?.role === 'BRAND')
 
+// --- handles, private campaigns and invitations ---------------------------------------
+await stranger.call('/api/me/role', 'PATCH', { role: 'CONTRIBUTOR' })
+const handle = `e2e_${randomBytes(3).toString('hex')}`
+const setHandle = await worker.call('/api/me/profile', 'PATCH', { handle: `@${handle.toUpperCase()}` })
+check('the contributor sets a handle (normalized)', setHandle.body?.profile?.handle === handle, setHandle.body?.error?.detail)
+check('a reserved handle is refused', (await stranger.call('/api/me/profile', 'PATCH', { handle: 'admin' })).status === 422)
+check('someone else cannot take the same handle', (await stranger.call('/api/me/profile', 'PATCH', { handle })).status === 409)
+const found = await brand.call(`/api/profiles?q=${handle.slice(0, 6)}`)
+check('the brand finds the contributor by handle', found.body?.profiles?.some((p) => p.handle === handle))
+
+const privateInput = {
+  ownerName: 'E2E Brand',
+  title: 'E2E: private clip edit',
+  brief: 'Edit one clip, for one invited person.',
+  requirements: ['Vertical'],
+  currency: 'NIM',
+  chain: null,
+  rewardMinor: '100000',
+  slots: 1,
+  deadline: null,
+  visibility: 'PRIVATE',
+  category: 'VIDEO',
+  platform: 'TikTok',
+  submissionInstructions: 'Share a folder link',
+  revisionLimit: 1,
+  invite: [{ handle }],
+}
+check('a private campaign without anyone to invite is refused', (await brand.call('/api/campaigns', 'POST', { ...privateInput, invite: [] })).status === 422)
+check('an invite to an unknown handle is refused before anything is created', (await brand.call('/api/campaigns', 'POST', { ...privateInput, invite: [{ handle: 'nobody_e2e_x' }] })).status === 404)
+const priv = await brand.call('/api/campaigns', 'POST', privateInput)
+check('the brand posts an invite-only campaign', priv.status === 201 && priv.body?.invitations?.length === 1, priv.body?.error?.detail)
+const privId = priv.body.campaign.id
+check('it is not in the public marketplace', !(await stranger.call('/api/campaigns')).body.open.some((c) => c.campaign.id === privId))
+check('an uninvited person gets 404 for its page', (await stranger.call(`/api/campaigns/${privId}`)).status === 404)
+check('a guest gets 404 too', (await fetch(`${BASE}/api/campaigns/${privId}`)).status === 404)
+check('an uninvited person cannot take it up by id', (await stranger.call(`/api/campaigns/${privId}/claim`, 'POST', { name: 'S' })).status === 404)
+const mine = await worker.call('/api/campaigns')
+const invite = mine.body?.invitations?.find((i) => i.campaign.id === privId)?.invitation
+check('the invitation reaches the contributor', !!invite)
+const view = await worker.call(`/api/campaigns/${privId}`)
+check('the invitee can open the campaign', view.status === 200 && view.body?.myInvitation?.status === 'PENDING')
+check('someone else cannot accept it', (await stranger.call(`/api/invitations/${invite.id}/accept`, 'POST', { name: 'S' })).status === 404)
+check('someone else cannot decline it', (await stranger.call(`/api/invitations/${invite.id}/decline`, 'POST')).status === 404)
+const accepted = await worker.call(`/api/invitations/${invite.id}/accept`, 'POST', { name: 'E2E Contributor' })
+check('the invitee accepts', accepted.status === 201, accepted.body?.error?.detail)
+check('accepting twice is refused', (await worker.call(`/api/invitations/${invite.id}/accept`, 'POST', { name: 'x' })).status === 409)
+const invPact = (await worker.call(`/api/pacts/${accepted.body.pactId}`)).body?.pact
+check('accepting created the agreement, unsigned', invPact?.participants?.every((p) => p.sealSignature === null))
+check('the brief’s working terms are in the agreement', invPact?.specialTerms?.includes('Platform: TikTok') && invPact?.specialTerms?.includes('Up to 1 revision round included.'))
+
+const byAddress = await brand.call(`/api/campaigns/${privId}/invitations`, 'POST', { address: 'NQ00 0000 0000 0000 0000 0000 0000 0000 0000' })
+check('an invalid wallet address is refused', byAddress.status === 422 || byAddress.status === 400)
+
 // --- brand posts a campaign ----------------------------------------------------------
 const campaignInput = {
   ownerName: 'E2E Brand',

@@ -6,6 +6,7 @@ import { toVerificationRecord } from '../pact/verification.ts'
 import { canPaymentTransition } from '../pact/paymentState.ts'
 import { normalizeAddress } from '../nimiq/address.ts'
 import type { AppRole } from '../pact/roles.ts'
+import type { PublicProfile } from '../pact/handles.ts'
 import type {
   Activity,
   ActivityKind,
@@ -64,6 +65,7 @@ interface Tables {
   // set once here always wins over whatever a single pact's participant row says.
   profiles: Map<string, string>
   roles: Map<string, AppRole>
+  details: Map<string, { handle: string | null; categories: string[]; links: string[] }>
 }
 
 function emptyTables(): Tables {
@@ -74,6 +76,7 @@ function emptyTables(): Tables {
     payments: new Map(),
     profiles: new Map(),
     roles: new Map(),
+    details: new Map(),
     deliverables: new Map(),
     negotiations: new Map(),
     disputes: new Map(),
@@ -813,6 +816,51 @@ export class MemoryRepository implements Repository {
 
   async setRole(address: string, role: AppRole): Promise<void> {
     this.t.roles.set(normalizeAddress(address), role)
+  }
+
+  async getProfile(address: string): Promise<PublicProfile> {
+    const wanted = normalizeAddress(address)
+    const details = this.t.details.get(wanted) ?? { handle: null, categories: [], links: [] }
+    return {
+      address: wanted,
+      handle: details.handle,
+      displayName: (await this.getTrustMetrics(wanted)).displayName,
+      categories: details.categories,
+      links: details.links,
+    }
+  }
+
+  async updateProfileDetails(
+    address: string,
+    patch: { handle?: string | null; categories?: string[]; links?: string[] },
+  ): Promise<PublicProfile> {
+    const wanted = normalizeAddress(address)
+    const current = this.t.details.get(wanted) ?? { handle: null, categories: [], links: [] }
+    if (patch.handle) {
+      for (const [owner, d] of this.t.details) {
+        if (owner !== wanted && d.handle === patch.handle) throw new RepoError('CONFLICT', 'That handle is taken.')
+      }
+    }
+    this.t.details.set(wanted, {
+      handle: patch.handle === undefined ? current.handle : patch.handle,
+      categories: patch.categories ?? current.categories,
+      links: patch.links ?? current.links,
+    })
+    return this.getProfile(wanted)
+  }
+
+  async findProfileByHandle(handle: string): Promise<PublicProfile | null> {
+    for (const [owner, d] of this.t.details) if (d.handle === handle) return this.getProfile(owner)
+    return null
+  }
+
+  async searchProfiles(prefix: string, limit: number): Promise<PublicProfile[]> {
+    const out: PublicProfile[] = []
+    for (const [owner, d] of this.t.details) {
+      if (d.handle && d.handle.startsWith(prefix)) out.push(await this.getProfile(owner))
+      if (out.length >= limit) break
+    }
+    return out.sort((a, b) => (a.handle ?? '').localeCompare(b.handle ?? ''))
   }
 
   async getProductStats(): Promise<ProductStats> {

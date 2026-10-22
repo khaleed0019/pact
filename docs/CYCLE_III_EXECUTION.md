@@ -465,7 +465,7 @@ history.
 
 ## 12. Current status dashboard
 
-Last updated: **2026-10-20** (session: role selection + premium UI + local two-identity run)
+Last updated: **2026-10-22** (session: public/private campaigns, handles, invitations, light theme, landing)
 
 Environment key: **U** unit test (node --test, in-process store) · **H** local HTTP run
 (`scripts/e2e-two-wallets.mjs`, real routes, generated Ed25519 keys, in-process store, no
@@ -491,9 +491,9 @@ Nimiq Pay host, no funds) · **DB** live Supabase query · **B** in-app browser 
 | Duplicate payment protection | DONE AND VERIFIED (U, DB) | Idempotency key + partial unique index `payments_confirmed_tx_unique` (0006) |
 | Supabase RLS / access control audit | DONE AND VERIFIED (DB) | All 16 `pact` relations: RLS on, 0 policies; `anon`/`authenticated`: no schema usage, no select, no execute on `claim_campaign_slot` |
 | Nimiq Pay host compatibility | NOT VERIFIED | Needs a run inside Nimiq Pay (owner) |
-| Mobile UI / accessibility | DONE AND VERIFIED (B) for new screens | 375px: role select, home, campaigns, detail + preview, pact progress, receipts, no horizontal overflow; focus ring visible; reduced motion and reduced transparency fallbacks. Dark theme only |
+| Mobile UI / accessibility | DONE AND VERIFIED (B) for checked screens | 375px dark + light (2026-10-22): landing, home, invitations, campaign detail/preview, pact progress, payment sheet; no horizontal overflow; focus ring; reduced motion/transparency fallbacks. Light theme shipped (follows device, Auto/Light/Dark switch) |
 | Production deployment | DONE AND VERIFIED (2026-10-20) | https://pact-nimiq.vercel.app serves commit 8cbe2bb (Vercel READY); smoke: / 200, /campaigns 200, /api/me 200 signedIn:false ephemeralStore:false, /api/dashboard 401 unauthenticated. E2E script NOT run against production (would write test data) |
-| Real two-wallet end-to-end journey | NOT DONE (H substitute only) | H is 32/32 but is not a Nimiq Pay run and has no real transaction |
+| Real two-wallet end-to-end journey | NOT DONE (H substitute only) | H is 52/52 (2026-10-22, now incl. invitations) but is not a Nimiq Pay run and has no real transaction |
 | Real usage / tester feedback | NOT DONE | none |
 | Competition category confirmed | DECIDED: **Pay** (2026-10-20) | miniappscompetition.com/cycle3: Earn = "staking or yield"; Pay = "bill splitting, merchant checkout, tipping, invoices, subscriptions". Pact pays for agreed work |
 | MIT license + public repo | DONE AND VERIFIED | github.com/khaleed0019/pact public; MIT in package.json + LICENSE |
@@ -585,6 +585,57 @@ older entries to make progress look better.
     experience and prioritize a full two-wallet end-to-end test.
 
 ### Add future entries below
+
+#### 2026-10-22 --- Public/private campaigns, handles, invitations, light theme, landing
+
+-   Owner decisions (asked first, per request): keep the desktop top bar; mobile-first,
+    borrow pieces from the mockup only; theme follows the phone with an override; add
+    campaign categories. Left out on purpose: Messages (no messaging feature exists) and
+    campaign thumbnails (no image storage; placeholders would be fake content).
+-   Migration `0009_campaign_visibility_handles_invitations.sql` (applied to live project
+    `pact`, additive): campaigns get `visibility` (default PUBLIC), `category` (default
+    OTHER), `submission_instructions`, `platform`, `revision_limit` (null); index swapped to
+    open+public; profiles get `handle` (unique, `^[a-z][a-z0-9_]{2,19}$`), `categories`,
+    `links`; new `campaign_invitations` (unique per campaign+address, RLS on, no policies).
+    Backfill: none needed — every existing campaign behaves exactly as before (public).
+-   Reused: pact creation/signing/review/payment engine unchanged; claim RPC unchanged;
+    invitations end in the existing `claimCampaign`, so slot locking, role gate and pact
+    creation are the same code path. Payment verifier untouched.
+-   New/changed files: `lib/pact/handles.ts`, `lib/campaigns/{model,store,memory,supabase,service,dashboard}.ts`,
+    `lib/db/{repo,memory,supabase}.ts` (profile details), `lib/api/schema.ts`,
+    `app/api/campaigns/route.ts`, `app/api/campaigns/[id]/route.ts` (visibility guard),
+    `app/api/campaigns/[id]/invitations/route.ts`, `app/api/invitations/[id]/{accept,decline,revoke}/route.ts`,
+    `app/api/profiles/route.ts`, `app/api/profiles/[handle]/route.ts`, `app/api/me/{route,profile/route}.ts`,
+    `components/campaigns/{InvitePicker,CampaignCard}.tsx`, `components/profile/HandleEditor.tsx`,
+    `components/ui/ThemeSwitch.tsx`, `lib/client/theme.ts`, `lib/themeScript.ts`, `lib/cn.ts`,
+    `tailwind.config.ts`, `app/globals.css`, `app/layout.tsx`, `app/campaigns/{page,new/page,[id]/page}.tsx`,
+    `app/trust/page.tsx`, `components/screens/{Welcome,RoleSelect,RoleDashboard}.tsx`,
+    `components/nav/{TabBar,WalletCapsule}.tsx`, `components/ui/Button.tsx`, `lib/pact/progress.ts`,
+    `tests/invitations.test.ts`, `scripts/e2e-two-wallets.mjs`.
+-   Bugs found and fixed: (1) submission instructions of 300 chars + "How to submit: "
+    would exceed the pact's 300-char term limit and fail agreement creation — input capped
+    at 280 (test). (2) `tailwind-merge` did not know the custom font sizes, so `text-body`
+    erased the primary button's text colour everywhere (pre-existing) — fixed in `lib/cn.ts`.
+-   Tests run and exact results:
+    -   `npm run verify`: typecheck clean, honesty check passed, **147/147** (U).
+    -   `npx next build`: compiled successfully.
+    -   `node scripts/e2e-two-wallets.mjs http://localhost:3100`: **52/52** (H) — adds handle
+        set/reserved/taken, handle search, private campaign 422 without invitees, unknown
+        handle refused before creation, private campaign absent from marketplace, 404 to an
+        uninvited user and to a guest, uninvited claim 404, invitee sees it, stranger cannot
+        accept/decline (404), accept 201, double accept 409, agreement unsigned with the
+        brief's working terms, invalid wallet address refused.
+    -   In-app browser (B), 375px: contributor home with "Invitations for you" (dark + light),
+        invitation review + accept via UI → agreement page, pact progress (light), payment
+        sheet (light), landing (dark + light), post-work form with handle search (dark).
+-   Environment: U, H, DB (migration), B. **Not** NP. **No** TX.
+-   Unproven: everything inside Nimiq Pay; a real NIM/USDT payment reaching CONFIRMED;
+    real users. Invitations by wallet address only work for checksum-valid addresses (the
+    demo account's sample address is not one, by design).
+-   Next action (owner, inside Nimiq Pay): Brand sets up, contributor sets a handle, brand
+    posts an invite-only campaign to that handle, contributor accepts, both sign, contributor
+    submits a link, brand requests one revision, contributor resubmits, brand approves and
+    pays a small NIM amount, press "Check payment status" until Verified. Record it here.
 
 #### 2026-10-20 --- Role selection, premium UI, two-identity run
 

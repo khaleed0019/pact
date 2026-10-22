@@ -33,6 +33,11 @@ function setup(slots = 2) {
       rewardMinor: '40000000',
       slots,
       deadline: null,
+      visibility: 'PUBLIC',
+      category: 'OTHER',
+      submissionInstructions: '',
+      platform: '',
+      revisionLimit: null,
       ...over,
     })
   const claim = (campaignId: string, who: string, name = 'Jobber') =>

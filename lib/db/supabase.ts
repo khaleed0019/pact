@@ -7,6 +7,7 @@ import { toVerificationRecord } from '../pact/verification.ts'
 import { canPaymentTransition } from '../pact/paymentState.ts'
 import { normalizeAddress } from '../nimiq/address.ts'
 import { isAppRole, type AppRole } from '../pact/roles.ts'
+import type { PublicProfile } from '../pact/handles.ts'
 import type {
   Activity,
   ActivityKind,
@@ -1092,6 +1093,69 @@ export class SupabaseRepository implements Repository {
       .from('profiles')
       .upsert({ address: normalized, role, role_chosen_at: new Date().toISOString() }, { onConflict: 'address' })
     if (error) fail(error, 'Could not save your role.')
+  }
+
+  private async toPublicProfile(row: Row | null, address: string): Promise<PublicProfile> {
+    const name = typeof row?.display_name === 'string' && row.display_name ? row.display_name : (await this.getTrustMetrics(address)).displayName
+    return {
+      address,
+      handle: (row?.handle as string | null) ?? null,
+      displayName: name,
+      categories: Array.isArray(row?.categories) ? (row!.categories as string[]) : [],
+      links: Array.isArray(row?.links) ? (row!.links as string[]) : [],
+    }
+  }
+
+  async getProfile(address: string): Promise<PublicProfile> {
+    const wanted = normalizeAddress(address)
+    const { data, error } = await this.db
+      .from('profiles')
+      .select('address, handle, display_name, categories, links')
+      .eq('address', wanted)
+      .maybeSingle()
+    if (error) fail(error, 'Could not load that profile.')
+    return this.toPublicProfile(data as Row | null, wanted)
+  }
+
+  async updateProfileDetails(
+    address: string,
+    patch: { handle?: string | null; categories?: string[]; links?: string[] },
+  ): Promise<PublicProfile> {
+    const normalized = await this.ensureUser(address)
+    const row: Row = { address: normalized }
+    if (patch.handle !== undefined) row.handle = patch.handle
+    if (patch.categories !== undefined) row.categories = patch.categories
+    if (patch.links !== undefined) row.links = patch.links
+    const { error } = await this.db.from('profiles').upsert(row, { onConflict: 'address' })
+    if (error) {
+      if (error.code === '23505') throw new RepoError('CONFLICT', 'That handle is taken.')
+      fail(error, 'Could not update your profile.')
+    }
+    return this.getProfile(normalized)
+  }
+
+  async findProfileByHandle(handle: string): Promise<PublicProfile | null> {
+    const { data, error } = await this.db
+      .from('profiles')
+      .select('address, handle, display_name, categories, links')
+      .eq('handle', handle)
+      .maybeSingle()
+    if (error) fail(error, 'Could not look that handle up.')
+    return data ? this.toPublicProfile(data as Row, String((data as Row).address)) : null
+  }
+
+  async searchProfiles(prefix: string, limit: number): Promise<PublicProfile[]> {
+    // `prefix` is validated to [a-z0-9_] by the route, so it is safe inside a LIKE pattern;
+    // underscores are escaped so they match literally.
+    const pattern = `${prefix.replace(/_/g, '\_')}%`
+    const { data, error } = await this.db
+      .from('profiles')
+      .select('address, handle, display_name, categories, links')
+      .like('handle', pattern)
+      .order('handle', { ascending: true })
+      .limit(limit)
+    if (error) fail(error, 'Could not search profiles.')
+    return Promise.all(((data ?? []) as Row[]).map((r) => this.toPublicProfile(r, String(r.address))))
   }
 
   /**

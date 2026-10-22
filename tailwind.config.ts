@@ -8,42 +8,44 @@ import type { Config } from 'tailwindcss'
  * a warm near-black rather than pure #000 — pure black reads as "unstyled" on OLED
  * phones and kills the sense of depth we need for the card stack.
  */
+/** A themed colour: `rgb(var(--name) / alpha)`. */
+const v = (name: string) => `rgb(var(--${name}) / <alpha-value>)`
+
 const config: Config = {
   content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}', './lib/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        // Canvas / surfaces
+        /*
+         * Every themed colour is a CSS variable holding "r g b" channels, so the same class
+         * (`bg-ink-850`, `text-chalk`, `bg-white/[0.05]`) works in both themes and Tailwind's
+         * `/opacity` modifiers keep working. Values live in app/globals.css under :root
+         * (dark) and [data-theme='light'].
+         *
+         * `white` and `black` are themed on purpose: across the app they mean "a tint of the
+         * foreground" and "a shade under it" (hairlines, overlays, input wells), which must
+         * invert with the theme. A literal white uses `[#fff]`.
+         */
         ink: {
-          950: '#07080A', // page behind everything
-          900: '#0B0D10', // app canvas
-          850: '#111419', // raised card
-          800: '#171B21', // hovered / nested card
-          700: '#1F242C', // input, divider-heavy surfaces
-          600: '#2B313B',
+          950: v('ink-950'),
+          900: v('ink-900'),
+          850: v('ink-850'),
+          800: v('ink-800'),
+          700: v('ink-700'),
+          600: v('ink-600'),
         },
-        // Text
-        chalk: {
-          DEFAULT: '#F4F6F8',
-          muted: '#9AA4B2',
-          faint: '#646E7E',
-        },
-        // Nimiq-adjacent brand
-        gold: {
-          DEFAULT: '#E9B213',
-          bright: '#F7C948',
-          deep: '#B8880A',
-        },
-        azure: {
-          DEFAULT: '#0582CA',
-          bright: '#3AA6E4',
-          deep: '#04618F',
-        },
-        // Semantic
-        jade: '#3FA98E', // success / completed / confirmed
-        amber: '#E0912F', // waiting / pending
-        rose: '#DC4C46', // failed / disputed / declined
-        violet: '#8B7BE8', // negotiation
+        chalk: { DEFAULT: v('chalk'), muted: v('chalk-muted'), faint: v('chalk-faint') },
+        gold: { DEFAULT: v('gold'), bright: v('gold-bright'), deep: v('gold-deep') },
+        azure: { DEFAULT: v('azure'), bright: v('azure-bright'), deep: v('azure-deep') },
+        jade: v('jade'),
+        amber: v('amber'),
+        rose: v('rose'),
+        violet: v('violet'),
+        white: v('tint'),
+        black: v('shade'),
+        // Fixed in both themes: the gold of a primary button and the ink on top of it.
+        sun: { DEFAULT: '#E9B213', light: '#F7C948', deep: '#B8880A' },
+        onsun: '#07080A',
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
@@ -66,9 +68,9 @@ const config: Config = {
       },
       boxShadow: {
         // Depth comes from a light top edge + a soft drop, not a heavy blur.
-        card: '0 1px 0 0 rgba(255,255,255,0.045) inset, 0 8px 24px -12px rgba(0,0,0,0.75)',
-        lift: '0 1px 0 0 rgba(255,255,255,0.06) inset, 0 20px 48px -20px rgba(0,0,0,0.9)',
-        sheet: '0 -8px 48px -12px rgba(0,0,0,0.85)',
+        card: 'var(--shadow-card)',
+        lift: 'var(--shadow-lift)',
+        sheet: 'var(--shadow-sheet)',
         'glow-gold': '0 0 0 1px rgba(233,178,19,0.28), 0 8px 32px -12px rgba(233,178,19,0.4)',
       },
       spacing: {

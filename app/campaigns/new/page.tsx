@@ -13,6 +13,9 @@ import type { UserFacingError } from '@/lib/errors'
 import { Button } from '@/components/ui/Button'
 import { Field, Segmented, TextArea, TextInput } from '@/components/ui/Field'
 import { ErrorNotice } from '@/components/ui/Bits'
+import { InvitePicker, toTarget, type Invitee } from '@/components/campaigns/InvitePicker'
+import { CAMPAIGN_CATEGORIES, CATEGORY_LABEL, type CampaignCategory, type CampaignVisibility } from '@/lib/campaigns/model'
+import { cn } from '@/lib/cn'
 
 /**
  * Post work.
@@ -34,6 +37,12 @@ export default function NewCampaignPage() {
   const [slots, setSlots] = useState('5')
   const [deadline, setDeadline] = useState('')
   const [name, setName] = useState(me?.displayName ?? '')
+  const [visibility, setVisibility] = useState<CampaignVisibility>('PUBLIC')
+  const [category, setCategory] = useState<CampaignCategory>('OTHER')
+  const [platform, setPlatform] = useState('')
+  const [submission, setSubmission] = useState('')
+  const [revisions, setRevisions] = useState<string>('2')
+  const [invitees, setInvitees] = useState<Invitee[]>([])
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<UserFacingError | null>(null)
@@ -55,6 +64,10 @@ export default function NewCampaignPage() {
       setFieldError('Spots must be a whole number from 1 to 500.')
       return
     }
+    if (visibility === 'PRIVATE' && invitees.length === 0) {
+      setFieldError('A private campaign needs at least one person to invite.')
+      return
+    }
 
     setBusy(true)
     try {
@@ -70,6 +83,12 @@ export default function NewCampaignPage() {
           rewardMinor,
           slots: count,
           deadline: deadline || null,
+          visibility,
+          category,
+          platform: platform.trim(),
+          submissionInstructions: submission.trim(),
+          revisionLimit: revisions === '' ? null : Number(revisions),
+          invite: invitees.map(toTarget),
         },
       })
       router.push(`/campaigns/${result.campaign.id}`)
@@ -79,7 +98,8 @@ export default function NewCampaignPage() {
     }
   }
 
-  const ready = title.trim() && brief.trim() && reward.trim() && (name || me?.displayName)
+  const ready =
+    title.trim() && brief.trim() && reward.trim() && (name || me?.displayName) && (visibility === 'PUBLIC' || invitees.length > 0)
 
   return (
     <main className="safe-top mx-auto w-full max-w-[34rem] px-5 pb-16">
@@ -109,6 +129,42 @@ export default function NewCampaignPage() {
         </div>
       ) : (
         <div className="space-y-5">
+          <Field label="Who can see it">
+            {() => (
+              <Segmented
+                label="Visibility"
+                value={visibility}
+                onChange={setVisibility}
+                options={[
+                  { value: 'PUBLIC', label: 'Public', hint: 'Listed for contributors' },
+                  { value: 'PRIVATE', label: 'Invite only', hint: 'Only people you invite' },
+                ]}
+              />
+            )}
+          </Field>
+
+          <Field label="Type of work">
+            {() => (
+              <div role="radiogroup" aria-label="Type of work" className="flex flex-wrap gap-2">
+                {CAMPAIGN_CATEGORIES.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    role="radio"
+                    aria-checked={category === c}
+                    onClick={() => setCategory(c)}
+                    className={cn(
+                      'focus-ring min-h-9 rounded-full border px-3.5 text-small transition-colors',
+                      category === c ? 'border-gold/45 bg-gold/10 text-chalk' : 'border-white/[0.08] text-chalk-muted active:bg-white/[0.06]',
+                    )}
+                  >
+                    {CATEGORY_LABEL[c]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </Field>
+
           <Field label="What’s the work?">
             {({ inputId }) => (
               <TextInput
@@ -161,6 +217,48 @@ export default function NewCampaignPage() {
                   </button>
                 )}
               </div>
+            )}
+          </Field>
+
+          <Field label="Platform" hint="Optional. Where the work goes out, if anywhere — e.g. TikTok, X, YouTube.">
+            {({ inputId }) => (
+              <TextInput id={inputId} value={platform} onChange={(e) => setPlatform(e.target.value)} maxLength={40} />
+            )}
+          </Field>
+
+          <Field label="How to submit" hint="Optional. What the contributor hands in — e.g. a shared folder link.">
+            {({ inputId }) => (
+              <TextInput id={inputId} value={submission} onChange={(e) => setSubmission(e.target.value)} maxLength={280} />
+            )}
+          </Field>
+
+          <Field label="Revision rounds" hint="How many times you can ask for changes. It becomes part of the signed terms.">
+            {() => (
+              <Segmented
+                label="Revision rounds"
+                value={revisions}
+                onChange={setRevisions}
+                options={[
+                  { value: '0', label: 'None' },
+                  { value: '1', label: '1' },
+                  { value: '2', label: '2' },
+                  { value: '3', label: '3' },
+                  { value: '', label: 'Not set' },
+                ]}
+              />
+            )}
+          </Field>
+
+          <Field
+            label={visibility === 'PRIVATE' ? 'Who to invite' : 'Invite someone directly (optional)'}
+            hint="Search by @handle, or paste their Nimiq address. Only that wallet can open the invitation, and accepting it signs nothing — you both sign the agreement after."
+          >
+            {() => (
+              <InvitePicker
+                chosen={invitees}
+                onAdd={(i) => setInvitees((list) => [...list, i])}
+                onRemove={(i) => setInvitees((list) => list.filter((x) => x.address !== i.address))}
+              />
             )}
           </Field>
 
@@ -229,7 +327,7 @@ export default function NewCampaignPage() {
           {error && <ErrorNotice error={error} />}
 
           <Button size="lg" fullWidth busy={busy} disabled={!ready} onClick={() => void submit()}>
-            Post work
+            {visibility === 'PRIVATE' ? `Send to ${invitees.length || 'your'} ${invitees.length === 1 ? 'person' : 'people'}` : 'Post work'}
           </Button>
         </div>
       )}

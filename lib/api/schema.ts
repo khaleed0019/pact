@@ -209,6 +209,18 @@ export const aiReviewSchema = z.object({
 
 // --- campaigns --------------------------------------------------------------------------
 
+/** Who to invite: exactly one of a Pact handle or a Nimiq address. */
+export const inviteTarget = z.union([
+  z.object({ handle: z.string().trim().min(1).max(21) }),
+  z.object({ address: nimiqAddress }),
+])
+
+export const profileDetailsSchema = z.object({
+  handle: z.string().trim().max(21).nullable().optional(),
+  categories: z.array(z.enum(['VIDEO', 'DESIGN', 'SOCIAL', 'WRITING', 'OTHER'])).max(5).optional(),
+  links: z.array(externalLink).max(4).optional(),
+})
+
 export const createCampaignSchema = z
   .object({
     ownerName: text(80),
@@ -222,6 +234,19 @@ export const createCampaignSchema = z
     rewardMinor: minorAmount,
     slots: z.number().int().min(1).max(500),
     deadline: isoDate.nullable().default(null),
+    visibility: z.enum(['PUBLIC', 'PRIVATE']).default('PUBLIC'),
+    category: z.enum(['VIDEO', 'DESIGN', 'SOCIAL', 'WRITING', 'OTHER']).default('OTHER'),
+    // 280, not 300: it becomes the term "How to submit: …", and a pact term caps at 300.
+    submissionInstructions: optionalText(280),
+    platform: optionalText(40),
+    revisionLimit: z.number().int().min(0).max(10).nullable().default(null),
+    // People to invite right away. Each is a handle or an exact Nimiq address; both are
+    // resolved and checked on the server.
+    invite: z.array(inviteTarget).max(20).default([]),
+  })
+  .refine((value) => value.visibility === 'PUBLIC' || value.invite.length > 0, {
+    message: 'A private campaign needs at least one person to invite.',
+    path: ['invite'],
   })
   .refine((value) => (value.currency === 'USDT' ? value.chain !== null : value.chain === null), {
     message: 'USDT campaigns need a network, and NIM campaigns must not have one.',

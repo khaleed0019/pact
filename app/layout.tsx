@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, JetBrains_Mono } from 'next/font/google'
 import { SessionProvider } from '@/lib/client/session'
+import { THEME_SCRIPT } from '@/lib/themeScript'
 import './globals.css'
 
 /*
@@ -35,7 +36,10 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#0B0D10',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#F5F6F8' },
+    { media: '(prefers-color-scheme: dark)', color: '#0B0D10' },
+  ],
   width: 'device-width',
   initialScale: 1,
   // The app must not zoom under a user's fingers mid-payment, but pinch-zoom stays
@@ -46,7 +50,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
+    // suppressHydrationWarning: the theme script sets data-theme before React hydrates.
+    <html lang="en" className={`${sans.variable} ${mono.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-[var(--app-height)]">
         <SessionProvider>{children}</SessionProvider>
       </body>

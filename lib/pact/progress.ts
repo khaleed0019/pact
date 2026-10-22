@@ -36,6 +36,7 @@ export function progressOf(pact: PactDetail): Step[] {
   const demoOnly = real.length === 0 && pact.payments.length > 0
   const sent = real.filter((p) => p.status === 'SUBMITTED' || p.status === 'CONFIRMED')
   const confirmed = real.filter((p) => p.status === 'CONFIRMED')
+  const failed = real.filter((p) => p.status === 'FAILED')
   const confirmedTotal = confirmed.length ? sumMinor(confirmed.map((p) => p.amountMinor)) : '0'
   const fullyPaid = BigInt(confirmedTotal) >= BigInt(pact.totalAmountMinor) && BigInt(pact.totalAmountMinor) > 0n
   const stopped = pact.status === 'DECLINED' || pact.status === 'CANCELLED'
@@ -92,8 +93,10 @@ export function progressOf(pact: PactDetail): Step[] {
             ? 'Part paid — more to come'
             : sent.length
               ? 'Waiting for the network to confirm'
+              : failed.length
+                ? 'A payment didn’t match the agreement — see Payments'
               : 'Only the network can confirm a payment',
-        state: fullyPaid ? 'done' : sent.length ? 'current' : 'upcoming',
+        state: fullyPaid ? 'done' : sent.length ? 'current' : failed.length ? 'attention' : 'upcoming',
         at: confirmed.at(-1)?.updatedAt ?? null,
       },
     )

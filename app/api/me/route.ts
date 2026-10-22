@@ -25,11 +25,12 @@ export async function GET(): Promise<NextResponse> {
     if (!session) return ok({ signedIn: false, capabilities })
 
     const repo = getRepository()
-    const [pacts, trust, notifications, role] = await Promise.all([
+    const [pacts, trust, notifications, role, profile] = await Promise.all([
       repo.listPactsForAddress(session.address),
       repo.getTrustMetrics(session.address),
       repo.refreshNotifications(session.address),
       repo.getRole(session.address),
+      repo.getProfile(session.address),
     ])
 
     return ok({
@@ -39,6 +40,7 @@ export async function GET(): Promise<NextResponse> {
       displayName: trust.displayName || 'You',
       // null means "not chosen yet" and sends the client to the role screen.
       role,
+      handle: profile.handle,
       pacts,
       trust,
       notifications,

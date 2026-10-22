@@ -20,13 +20,41 @@ import type { Currency, EvmChainKey } from '../pact/types.ts'
 export const CAMPAIGN_STATUSES = ['OPEN', 'PAUSED', 'CLOSED', 'CANCELLED'] as const
 export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number]
 
+/**
+ * PUBLIC campaigns are listed in the marketplace and anyone eligible can take one up.
+ * PRIVATE campaigns are never listed: only the owner, the people they invited and people
+ * already working on it can see them, and only an invited address can take one up.
+ */
+export const CAMPAIGN_VISIBILITIES = ['PUBLIC', 'PRIVATE'] as const
+export type CampaignVisibility = (typeof CAMPAIGN_VISIBILITIES)[number]
+
+export const CAMPAIGN_CATEGORIES = ['VIDEO', 'DESIGN', 'SOCIAL', 'WRITING', 'OTHER'] as const
+export type CampaignCategory = (typeof CAMPAIGN_CATEGORIES)[number]
+
+export const CATEGORY_LABEL: Record<CampaignCategory, string> = {
+  VIDEO: 'Video',
+  DESIGN: 'Design',
+  SOCIAL: 'Social media',
+  WRITING: 'Writing',
+  OTHER: 'Other',
+}
+
 export interface Campaign {
   id: string
   ownerAddress: string
   ownerName: string
   title: string
   brief: string
+  /** Acceptance criteria: what the work must include for the brand to approve it. */
   requirements: string[]
+  visibility: CampaignVisibility
+  category: CampaignCategory
+  /** How to hand the work in — e.g. "Share a Drive folder link". Becomes a term of the pact. */
+  submissionInstructions: string
+  /** Where the work goes out, if anywhere — "TikTok", "X". Becomes a term of the pact. */
+  platform: string
+  /** Rounds of changes the brand may ask for. Null means the brief does not set a limit. */
+  revisionLimit: number | null
   currency: Currency
   chain: EvmChainKey | null
   rewardMinor: string
@@ -43,6 +71,30 @@ export interface CampaignClaim {
   jobberAddress: string
   pactId: string | null
   createdAt: string
+}
+
+export const INVITATION_STATUSES = ['PENDING', 'ACCEPTED', 'DECLINED', 'REVOKED'] as const
+export type InvitationStatus = (typeof INVITATION_STATUSES)[number]
+
+/**
+ * An offer of a campaign to one specific address. It is not an agreement and signs
+ * nothing: accepting it runs the ordinary claim, which creates the pact both sides sign.
+ */
+export interface CampaignInvitation {
+  id: string
+  campaignId: string
+  inviteeAddress: string
+  invitedBy: string
+  via: 'HANDLE' | 'ADDRESS'
+  status: InvitationStatus
+  pactId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+/** PENDING resolves exactly once; ACCEPTED, DECLINED and REVOKED are final. */
+export function canInvitationTransition(from: InvitationStatus, to: InvitationStatus): boolean {
+  return from === 'PENDING' && to !== 'PENDING'
 }
 
 const GRAPH: Record<CampaignStatus, readonly CampaignStatus[]> = {

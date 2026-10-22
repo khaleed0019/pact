@@ -19,7 +19,7 @@ type Size = 'sm' | 'md' | 'lg'
 
 const VARIANTS: Record<Variant, string> = {
   primary:
-    'bg-gradient-to-b from-gold-bright to-gold text-ink-950 font-semibold shadow-glow-gold active:from-gold active:to-gold-deep',
+    'bg-gradient-to-b from-sun-light to-sun text-onsun font-semibold shadow-glow-gold active:from-sun active:to-sun-deep',
   secondary: 'bg-white/[0.07] text-chalk border border-white/[0.09] active:bg-white/[0.11]',
   ghost: 'bg-transparent text-chalk-muted active:bg-white/[0.05]',
   quiet: 'bg-transparent text-chalk-muted underline underline-offset-4 decoration-white/25 active:text-chalk',

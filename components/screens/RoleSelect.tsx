@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { AddressChip, ErrorNotice } from '@/components/ui/Bits'
 import type { UserFacingError } from '@/lib/errors'
 import { cn } from '@/lib/cn'
+import { INTENT_KEY } from '@/components/screens/Welcome'
 
 const ICON: Record<AppRole, typeof Briefcase> = { BRAND: Briefcase, CONTRIBUTOR: Sparkles }
 
@@ -29,7 +30,16 @@ const ICON: Record<AppRole, typeof Briefcase> = { BRAND: Briefcase, CONTRIBUTOR:
 export function RoleSelect({ mode = 'first-run', onDone }: { mode?: 'first-run' | 'switch'; onDone?: () => void }) {
   const { me, chooseRole } = useSession()
   const reduceMotion = useReducedMotion()
-  const [selected, setSelected] = useState<AppRole | null>(me?.role ?? null)
+  // Preselect the door they came in through on the landing page; they still confirm it.
+  const [selected, setSelected] = useState<AppRole | null>(() => {
+    if (me?.role) return me.role
+    try {
+      const intent = sessionStorage.getItem(INTENT_KEY)
+      return intent === 'BRAND' || intent === 'CONTRIBUTOR' ? intent : null
+    } catch {
+      return null
+    }
+  })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<UserFacingError | null>(null)
 
@@ -125,7 +135,7 @@ export function RoleSelect({ mode = 'first-run', onDone }: { mode?: 'first-run' 
                       aria-hidden
                       className={cn(
                         'mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-all duration-200',
-                        active ? 'border-gold bg-gold text-ink-950' : 'border-white/20',
+                        active ? 'border-sun bg-sun text-onsun' : 'border-white/20',
                       )}
                     >
                       {active && <Check className="h-3.5 w-3.5" strokeWidth={3} />}

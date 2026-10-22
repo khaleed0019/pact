@@ -1,8 +1,8 @@
 import Link from 'next/link'
-import { CalendarClock, ChevronRight, Users } from 'lucide-react'
+import { CalendarClock, ChevronRight, Lock, Users } from 'lucide-react'
 import { Money } from '@/components/ui/Bits'
 import { relativeDeadline } from '@/lib/format'
-import type { BudgetSummary, Campaign, CampaignStatus } from '@/lib/campaigns/model'
+import { CATEGORY_LABEL, type BudgetSummary, type Campaign, type CampaignStatus } from '@/lib/campaigns/model'
 import { cn } from '@/lib/cn'
 
 const STATUS_LABEL: Record<CampaignStatus, string> = {
@@ -45,6 +45,15 @@ export function CampaignCard({ campaign, budget }: { campaign: Campaign; budget:
       href={`/campaigns/${campaign.id}`}
       className="surface focus-ring group block px-4 py-4 transition-[transform,background-color] duration-150 hover:bg-ink-800 active:scale-[0.99]"
     >
+      <div className="mb-2 flex flex-wrap items-center gap-1.5">
+        <span className="rounded-pill bg-white/[0.06] px-2 py-0.5 text-[0.65rem] text-chalk-muted">{CATEGORY_LABEL[campaign.category]}</span>
+        {campaign.visibility === 'PRIVATE' && (
+          <span className="inline-flex items-center gap-1 rounded-pill bg-azure/10 px-2 py-0.5 text-[0.65rem] text-azure-bright">
+            <Lock aria-hidden className="h-3 w-3" />
+            Invite only
+          </span>
+        )}
+      </div>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="line-clamp-2 text-body font-semibold leading-snug text-chalk">{campaign.title}</p>
