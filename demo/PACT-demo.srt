@@ -1,0 +1,112 @@
+1
+00:00:01,939 --> 00:00:16,159
+This is PACT, a Nimiq Pay mini app that turns a real work
+agreement into a traceable, verified payment. A brand posts
+a clear brief, both sides sign the exact terms with their
+wallets, and payment is checked on chain.
+
+2
+00:00:16,665 --> 00:00:33,080
+The landing page explains who it's for, brands and
+contributors, and the four steps: brief, agree, deliver, and
+pay. It also says plainly what PACT is not. It never holds
+funds. Money goes straight from wallet to wallet.
+
+3
+00:00:33,586 --> 00:00:47,941
+Inside Nimiq Pay you would continue with your wallet. In a
+normal browser we use the demo, which is clearly marked as
+sample data. The first time you sign in, PACT asks how you
+will use it. We'll start as a contributor.
+
+4
+00:00:48,447 --> 00:01:00,628
+The contributor dashboard is built from real records. At the
+top is an invitation a brand sent directly to this account.
+Below it are open campaigns and the agreements already in
+progress.
+
+5
+00:01:01,131 --> 00:01:12,906
+Find work lists public campaigns. You can filter by type of
+work, by currency, and by whether spots are still open.
+Invite only campaigns never appear in this list.
+
+6
+00:01:19,065 --> 00:01:30,001
+Let's search for a banner job and open it. Each campaign
+shows the reward per person, the deadline, how many spots
+are left, and the full brief with its requirements.
+
+7
+00:01:30,504 --> 00:01:41,157
+Before committing, the contributor reads the exact agreement
+they would get. The platform, how to submit, and the number
+of revision rounds all become signed terms.
+
+8
+00:01:41,660 --> 00:01:52,349
+Now the invitation. It is bound to this wallet. Nobody else
+can see it, open it, or accept it, and a private campaign
+never shows up in the public list.
+
+9
+00:01:52,854 --> 00:02:02,488
+Accepting does not sign anything. It creates the agreement,
+and both sides still sign the exact terms with their wallets
+before any work starts.
+
+10
+00:02:03,592 --> 00:02:15,189
+The agreement page shows real progress from saved data:
+terms written, both signatures, work submitted, review,
+payment sent, and finally verified on the network.
+
+11
+00:02:15,696 --> 00:02:22,881
+The same wallet can switch roles from the account menu.
+Agreements already made stay exactly as they are.
+
+12
+00:02:28,880 --> 00:02:43,141
+As a brand, the dashboard starts with posting work. Once
+campaigns are live, it separates what posting could commit,
+what has been agreed, and what has been verified as paid. A
+budget is never money set aside.
+
+13
+00:02:43,644 --> 00:02:54,999
+Posting work takes a title, a brief, the type of work,
+requirements, a reward, the number of spots, and a deadline.
+This one will be invite only.
+
+14
+00:03:04,352 --> 00:03:15,341
+Contributors can be invited by their Pact handle or an exact
+wallet address. The search shows the wallet next to each
+handle, because the invitation is bound to that wallet.
+
+15
+00:03:16,375 --> 00:03:28,279
+Once it's sent, the brand tracks the invitation and the
+people working. The budget shows the most this campaign
+could commit, what's been agreed, and only the payments the
+network has confirmed.
+
+16
+00:03:28,784 --> 00:03:42,444
+A wallet sending money only marks a payment as sent. PACT
+reads the Nimiq network itself and shows verified only when
+the transaction matches the agreement. This demo payment is
+sample data, and it says so.
+
+17
+00:03:42,954 --> 00:03:48,037
+There's a light theme too. By default it simply follows your
+phone.
+
+18
+00:03:52,019 --> 00:04:01,778
+PACT. A clear brief, signed terms, and a trackable payment,
+inside Nimiq Pay. It's open source under the MIT license.
+

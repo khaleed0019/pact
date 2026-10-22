@@ -14,3 +14,7 @@ next-env.d.ts
 .DS_Store
 Thumbs.db
 npm-debug.log*
+
+# demo video build artefacts (recordings, audio, frames)
+demo/build/
+demo/PACT-demo.mp4

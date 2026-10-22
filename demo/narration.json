@@ -1,0 +1,92 @@
+[
+  {
+    "id": "intro",
+    "chapter": "What PACT is",
+    "text": "This is PACT, a Nimiq Pay mini app that turns a real work agreement into a traceable, verified payment. A brand posts a clear brief, both sides sign the exact terms with their wallets, and payment is checked on chain."
+  },
+  {
+    "id": "landing",
+    "chapter": "Who it's for",
+    "text": "The landing page explains who it's for, brands and contributors, and the four steps: brief, agree, deliver, and pay. It also says plainly what PACT is not. It never holds funds. Money goes straight from wallet to wallet."
+  },
+  {
+    "id": "role",
+    "chapter": "Choose a role",
+    "text": "Inside Nimiq Pay you would continue with your wallet. In a normal browser we use the demo, which is clearly marked as sample data. The first time you sign in, PACT asks how you will use it. We'll start as a contributor."
+  },
+  {
+    "id": "contributor-home",
+    "chapter": "Contributor dashboard",
+    "text": "The contributor dashboard is built from real records. At the top is an invitation a brand sent directly to this account. Below it are open campaigns and the agreements already in progress."
+  },
+  {
+    "id": "find-work",
+    "chapter": "Find work",
+    "text": "Find work lists public campaigns. You can filter by type of work, by currency, and by whether spots are still open. Invite only campaigns never appear in this list."
+  },
+  {
+    "id": "search",
+    "chapter": "Search and details",
+    "text": "Let's search for a banner job and open it. Each campaign shows the reward per person, the deadline, how many spots are left, and the full brief with its requirements."
+  },
+  {
+    "id": "preview",
+    "chapter": "Read the terms first",
+    "text": "Before committing, the contributor reads the exact agreement they would get. The platform, how to submit, and the number of revision rounds all become signed terms."
+  },
+  {
+    "id": "invitation",
+    "chapter": "A private invitation",
+    "text": "Now the invitation. It is bound to this wallet. Nobody else can see it, open it, or accept it, and a private campaign never shows up in the public list."
+  },
+  {
+    "id": "accept",
+    "chapter": "Accept, then sign",
+    "text": "Accepting does not sign anything. It creates the agreement, and both sides still sign the exact terms with their wallets before any work starts."
+  },
+  {
+    "id": "agreement",
+    "chapter": "The agreement",
+    "text": "The agreement page shows real progress from saved data: terms written, both signatures, work submitted, review, payment sent, and finally verified on the network."
+  },
+  {
+    "id": "switch",
+    "chapter": "Switch to Brand",
+    "text": "The same wallet can switch roles from the account menu. Agreements already made stay exactly as they are."
+  },
+  {
+    "id": "brand-home",
+    "chapter": "Brand dashboard",
+    "text": "As a brand, the dashboard starts with posting work. Once campaigns are live, it separates what posting could commit, what has been agreed, and what has been verified as paid. A budget is never money set aside."
+  },
+  {
+    "id": "post",
+    "chapter": "Post a campaign",
+    "text": "Posting work takes a title, a brief, the type of work, requirements, a reward, the number of spots, and a deadline. This one will be invite only."
+  },
+  {
+    "id": "invite",
+    "chapter": "Invite by handle",
+    "text": "Contributors can be invited by their Pact handle or an exact wallet address. The search shows the wallet next to each handle, because the invitation is bound to that wallet."
+  },
+  {
+    "id": "owner",
+    "chapter": "Track the campaign",
+    "text": "Once it's sent, the brand tracks the invitation and the people working. The budget shows the most this campaign could commit, what's been agreed, and only the payments the network has confirmed."
+  },
+  {
+    "id": "payments",
+    "chapter": "Verified payments",
+    "text": "A wallet sending money only marks a payment as sent. PACT reads the Nimiq network itself and shows verified only when the transaction matches the agreement. This demo payment is sample data, and it says so."
+  },
+  {
+    "id": "theme",
+    "chapter": "Light and dark",
+    "text": "There's a light theme too. By default it simply follows your phone."
+  },
+  {
+    "id": "outro",
+    "chapter": "PACT",
+    "text": "PACT. A clear brief, signed terms, and a trackable payment, inside Nimiq Pay. It's open source under the MIT license."
+  }
+]
