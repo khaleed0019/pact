@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   AlertTriangle,
@@ -9,6 +9,7 @@ import {
   CalendarClock,
   Check,
   CircleDollarSign,
+  Mail,
   MessageSquareReply,
   PackageCheck,
   PenLine,
@@ -21,6 +22,8 @@ import { EmptyState, SectionTitle, Skeleton } from '@/components/ui/Bits'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
 import type { Notification, NotificationKind } from '@/lib/pact/types'
+import type { Campaign } from '@/lib/campaigns/model'
+import { formatWithCurrency } from '@/lib/pact/money'
 
 /**
  * Activity — Smart Reminders, given an actual screen.
@@ -56,6 +59,14 @@ const TONE: Record<NotificationKind, string> = {
 
 export default function ActivityPage() {
   const { me, loading, refresh } = useSession()
+  // Campaign invitations live with campaigns, not with pact reminders; show them here too.
+  const [invitations, setInvitations] = useState<Array<{ invitation: { id: string }; campaign: Campaign }>>([])
+  useEffect(() => {
+    if (!me?.signedIn) return
+    api<{ invitations: Array<{ invitation: { id: string }; campaign: Campaign }> }>('/api/campaigns')
+      .then((d) => setInvitations(d.invitations))
+      .catch(() => setInvitations([]))
+  }, [me?.signedIn])
   const [readingAll, setReadingAll] = useState(false)
   const [localRead, setLocalRead] = useState<Set<string>>(new Set())
 
@@ -109,7 +120,32 @@ export default function ActivityPage() {
           )}
         </header>
 
-        {notifications.length === 0 ? (
+        {invitations.length > 0 && (
+          <section className="mb-6">
+            <SectionTitle>Invitations for you</SectionTitle>
+            <div className="surface divide-y divide-white/[0.06] overflow-hidden">
+              {invitations.map(({ invitation, campaign }) => (
+                <Link
+                  key={invitation.id}
+                  href={`/campaigns/${campaign.id}`}
+                  className="focus-ring flex items-start gap-3 px-4 py-3.5 active:bg-white/[0.03]"
+                >
+                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold/10 text-gold-bright">
+                    <Mail aria-hidden className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-small font-semibold text-chalk">{campaign.title}</p>
+                    <p className="mt-0.5 text-[0.7rem] text-chalk-muted">
+                      {campaign.ownerName} invited you · {formatWithCurrency(campaign.rewardMinor, campaign.currency)}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {notifications.length === 0 && invitations.length > 0 ? null : notifications.length === 0 ? (
           <div className="surface">
             <EmptyState
               icon={<Bell className="h-8 w-8" />}

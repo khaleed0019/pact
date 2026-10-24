@@ -586,6 +586,19 @@ older entries to make progress look better.
 
 ### Add future entries below
 
+#### 2026-10-24 --- Bug hunt before submission
+
+-   Re-ran: `npm run verify` 148/148; `scripts/e2e-two-wallets.mjs` 52/52 (H); route sweep in
+    the browser (pacts, activity, trust, discover, stats, verify, new) with no unexpected
+    console errors; production site read-only check.
+-   Found and fixed: (1) public /stats counted demo-account agreements and seeded `demo:`
+    payments as real usage (production showed 1,260 NIM settled; the real figure is 10 NIM)
+    — stats now exclude every agreement involving the demo address and all `demo:`
+    payments, and count campaign invitations alongside share links. Expected production
+    figures after deploy (computed in SQL): 18 agreements, 12 people, 2 fully signed,
+    1 confirmed payment, 10 NIM. (2) Activity did not show campaign invitations — it does now.
+-   Earlier today: pronoun names ("You"/"Me") were stored on agreements — fixed in f94286e.
+
 #### 2026-10-24 --- Live two-phone run recorded (owner-reported, evidence checked)
 
 -   Owner report: the end-to-end flow was run on two phones inside Nimiq Pay and worked.

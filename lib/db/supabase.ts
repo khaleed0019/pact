@@ -6,6 +6,7 @@ import { sumMinor } from '../pact/money.ts'
 import { toVerificationRecord } from '../pact/verification.ts'
 import { canPaymentTransition } from '../pact/paymentState.ts'
 import { normalizeAddress } from '../nimiq/address.ts'
+import { DEMO_ADDRESSES } from './seed.ts'
 import { isAppRole, type AppRole } from '../pact/roles.ts'
 import type { PublicProfile } from '../pact/handles.ts'
 import type {
@@ -1167,28 +1168,33 @@ export class SupabaseRepository implements Repository {
    * against, contributes nothing.
    */
   async getProductStats(): Promise<ProductStats> {
-    // `head: true` means these return a count and no rows at all.
-    const HEAD = { count: 'exact' as const, head: true }
-    const [pacts, completed, published, invites, accepted, disputes, resolved] = await Promise.all([
-      this.db.from('pacts').select('*', HEAD),
-      this.db.from('pacts').select('*', HEAD).eq('status', 'COMPLETED'),
-      this.db.from('pacts').select('*', HEAD).neq('visibility', 'PRIVATE'),
-      this.db.from('invitations').select('*', HEAD),
-      this.db.from('invitations').select('*', HEAD).not('accepted_at', 'is', null),
-      this.db.from('disputes').select('*', HEAD),
-      this.db.from('disputes').select('*', HEAD).eq('status', 'RESOLVED'),
-    ])
-
-    // These three need the rows themselves: distinct addresses, sealed-on-both-sides, and
-    // per-currency totals are not things a count(*) can answer.
-    const [participantRows, paymentRows] = await Promise.all([
+    /*
+     * Real usage only. Anyone can press "Explore the demo" on the live site, which signs
+     * them in as the shared sample account; everything that account touches — and every
+     * seeded `demo:` payment — is sample data, and counting it would publish invented usage
+     * as if it were real. So agreements with the demo address on them are excluded from
+     * every figure, along with their invitations, disputes and payments.
+     */
+    const demo = normalizeAddress(DEMO_ADDRESSES.khaleed)
+    const [pactRows, participantRows, inviteRows, disputeRows, paymentRows, campaignInvites] = await Promise.all([
+      this.db.from('pacts').select('id, status, visibility'),
       this.db.from('pact_participants').select('pact_id, address, seal_signature'),
-      this.db.from('payments').select('amount_minor::text, currency, status, tx_reference').eq('status', 'CONFIRMED'),
+      this.db.from('invitations').select('pact_id, accepted_at'),
+      this.db.from('disputes').select('pact_id, status'),
+      this.db.from('payments').select('pact_id, amount_minor::text, currency, status, tx_reference').eq('status', 'CONFIRMED'),
+      this.db.from('campaign_invitations').select('invitee_address, invited_by, status'),
     ])
 
+    const participants = (participantRows.data ?? []) as Row[]
+    const demoPacts = new Set(
+      participants.filter((r) => nullable(r.address) && normalizeAddress(str(r.address)) === demo).map((r) => str(r.pact_id)),
+    )
+    const real = <T extends Row>(rows: T[]) => rows.filter((r) => !demoPacts.has(str(r.pact_id ?? r.id)))
+
+    const pacts = real((pactRows.data ?? []) as Row[])
     const addresses = new Set<string>()
     const sealedByPact = new Map<string, { total: number; signed: number }>()
-    for (const row of ((participantRows.data ?? []) as Row[])) {
+    for (const row of real(participants)) {
       const address = nullable(row.address)
       if (address) addresses.add(normalizeAddress(address))
       const pactId = str(row.pact_id)
@@ -1200,8 +1206,9 @@ export class SupabaseRepository implements Repository {
 
     const valueByCurrency: Record<string, string> = {}
     let paymentsConfirmed = 0
-    for (const row of ((paymentRows.data ?? []) as Row[])) {
-      if (!nullable(row.tx_reference)) continue
+    for (const row of real((paymentRows.data ?? []) as Row[])) {
+      const reference = nullable(row.tx_reference)
+      if (!reference || reference.startsWith('demo:')) continue
       paymentsConfirmed += 1
       const currency = str(row.currency)
       valueByCurrency[currency] = sumMinor([valueByCurrency[currency] ?? '0', str(row.amount_minor)])
@@ -1212,18 +1219,26 @@ export class SupabaseRepository implements Repository {
       if (tally.total > 0 && tally.total === tally.signed) pactsSealed += 1
     }
 
+    // Invitations of both kinds: share links on a pact, and campaign invitations to a wallet.
+    const invites = real((inviteRows.data ?? []) as Row[])
+    const campaignRows = ((campaignInvites.data ?? []) as Row[]).filter(
+      (r) => normalizeAddress(str(r.invitee_address)) !== demo && normalizeAddress(str(r.invited_by)) !== demo,
+    )
+    const disputes = real((disputeRows.data ?? []) as Row[])
+
     return {
-      pactsCreated: pacts.count ?? 0,
+      pactsCreated: pacts.length,
       pactsSealed,
-      pactsCompleted: completed.count ?? 0,
+      pactsCompleted: pacts.filter((r) => str(r.status) === 'COMPLETED').length,
       participants: addresses.size,
-      invitationsAccepted: accepted.count ?? 0,
-      invitationsSent: invites.count ?? 0,
+      invitationsSent: invites.length + campaignRows.length,
+      invitationsAccepted:
+        invites.filter((r) => nullable(r.accepted_at)).length + campaignRows.filter((r) => str(r.status) === 'ACCEPTED').length,
       paymentsConfirmed,
       valueByCurrency,
-      publicRecords: published.count ?? 0,
-      disputesRaised: disputes.count ?? 0,
-      disputesResolved: resolved.count ?? 0,
+      publicRecords: pacts.filter((r) => str(r.visibility) !== 'PRIVATE').length,
+      disputesRaised: disputes.length,
+      disputesResolved: disputes.filter((r) => str(r.status) === 'RESOLVED').length,
     }
   }
 
