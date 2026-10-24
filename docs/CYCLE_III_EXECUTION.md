@@ -465,7 +465,7 @@ history.
 
 ## 12. Current status dashboard
 
-Last updated: **2026-10-22** (session: public/private campaigns, handles, invitations, light theme, landing)
+Last updated: **2026-10-24** (live two-phone run recorded with on-chain evidence)
 
 Environment key: **U** unit test (node --test, in-process store) · **H** local HTTP run
 (`scripts/e2e-two-wallets.mjs`, real routes, generated Ed25519 keys, in-process store, no
@@ -475,7 +475,7 @@ Nimiq Pay host, no funds) · **DB** live Supabase query · **B** in-app browser 
 | Area | Status | Evidence |
 |---|---|---|
 | Existing architecture re-audited | DONE AND VERIFIED | Baseline commit c86df8a; read lib/db/*, lib/campaigns/*, lib/nimiq/*, app/api/*, lib/auth/session.ts; SDK d.ts confirms `listAccounts`, `sign`, `sendBasicTransaction(WithData)`, `isConsensusEstablished`, `getBlockNumber`, staking calls; no balance API |
-| First-time Nimiq wallet connection | IMPLEMENTED BUT NOT VERIFIED in NP | Sign-in = server nonce, wallet `sign()`, server Ed25519 verify, address derived server-side. Verified with generated keys (H). Not run inside Nimiq Pay this session |
+| First-time Nimiq wallet connection | DONE AND VERIFIED (NP, 2026-10-24) | Two real wallets signed in inside Nimiq Pay (owner run); roles saved (5 profiles with a role in production). Earlier note: | Sign-in = server nonce, wallet `sign()`, server Ed25519 verify, address derived server-side. Verified with generated keys (H). Not run inside Nimiq Pay this session |
 | Brand/Contributor choice after wallet connection | DONE AND VERIFIED (B, H); NP not verified | `components/screens/RoleSelect.tsx`, `app/page.tsx`; shown when `/api/me` role is null (B: demo session; H: new key) |
 | Returning-user role restoration | DONE AND VERIFIED (B, H) | Reload restores role and dashboard; H check "the role is restored on the next visit" |
 | Safe role switching | DONE AND VERIFIED (U, B) | Wallet capsule menu and profile; one profile row per address (upsert on PK); U "switching keeps one profile"; agreements unaffected (roles on pacts) |
@@ -485,15 +485,15 @@ Nimiq Pay host, no funds) · **DB** live Supabase query · **B** in-app browser 
 | Campaign to Pact agreement linkage | DONE AND VERIFIED (U, H, B) | UI claim lands on pact with "From the campaign" link and progress stepper |
 | Submission and revision flow | DONE AND VERIFIED (H); not in NP | H: submit, changes requested with reason, resubmit, approve |
 | Brand approval permissions | DONE AND VERIFIED (H) | H: contributor approving own work 403 |
-| NIM verifier | U fixtures + H live-RPC negative; LIVE POSITIVE UNPROVEN | H: invented hash checked against live rpc.nimiqwatch.com stays SUBMITTED. No real PACT payment confirmed yet |
+| NIM verifier | DONE AND VERIFIED (TX, 2026-10-24) | Real 10 NIM mainnet payment 9f62a541… CONFIRMED by the server and independently re-checked on rpc.nimiqwatch.com (executed, networkId 24, memo matches). Earlier: | H: invented hash checked against live rpc.nimiqwatch.com stays SUBMITTED. No real PACT payment confirmed yet |
 | USDT verifier | FIXTURES ONLY | No real USDT payment |
 | Pending payment recovery | DONE AND VERIFIED (H, B) | Re-check by either party; receipt "Check payment status"; stranger 403 |
 | Duplicate payment protection | DONE AND VERIFIED (U, DB) | Idempotency key + partial unique index `payments_confirmed_tx_unique` (0006) |
 | Supabase RLS / access control audit | DONE AND VERIFIED (DB) | All 16 `pact` relations: RLS on, 0 policies; `anon`/`authenticated`: no schema usage, no select, no execute on `claim_campaign_slot` |
-| Nimiq Pay host compatibility | NOT VERIFIED | Needs a run inside Nimiq Pay (owner) |
+| Nimiq Pay host compatibility | DONE AND VERIFIED (NP, 2026-10-24) | Owner ran the flow on two phones inside Nimiq Pay |
 | Mobile UI / accessibility | DONE AND VERIFIED (B) for checked screens | 375px dark + light (2026-10-22): landing, home, invitations, campaign detail/preview, pact progress, payment sheet; no horizontal overflow; focus ring; reduced motion/transparency fallbacks. Light theme shipped (follows device, Auto/Light/Dark switch) |
 | Production deployment | DONE AND VERIFIED (2026-10-20) | https://pact-nimiq.vercel.app serves commit 8cbe2bb (Vercel READY); smoke: / 200, /campaigns 200, /api/me 200 signedIn:false ephemeralStore:false, /api/dashboard 401 unauthenticated. E2E script NOT run against production (would write test data) |
-| Real two-wallet end-to-end journey | NOT DONE (H substitute only) | H is 52/52 (2026-10-22, now incl. invitations) but is not a Nimiq Pay run and has no real transaction |
+| Real two-wallet end-to-end journey | DONE AND VERIFIED for invite → accept → both sign → pay → verified (NP + TX, 2026-10-24); submission/revision/approval not in the live run | H is 52/52 (2026-10-22, now incl. invitations) but is not a Nimiq Pay run and has no real transaction |
 | Real usage / tester feedback | NOT DONE | none |
 | Competition category confirmed | DECIDED: **Pay** (2026-10-20) | miniappscompetition.com/cycle3: Earn = "staking or yield"; Pay = "bill splitting, merchant checkout, tipping, invoices, subscriptions". Pact pays for agreed work |
 | MIT license + public repo | DONE AND VERIFIED | github.com/khaleed0019/pact public; MIT in package.json + LICENSE |
@@ -521,7 +521,7 @@ failed; record the failure and next fix.
 
 ### Gate B --- Complete user journey
 
--   [ ] New user connects through the supported Nimiq Pay context.
+-   [x] New user connects through the supported Nimiq Pay context. (NP, 2026-10-24)
 -   [x] New user chooses Brand or Contributor after wallet identity is
     available. (B, H; not yet inside Nimiq Pay)
 -   [x] Returning user gets the correct dashboard. (B, H)
@@ -530,8 +530,8 @@ failed; record the failure and next fix.
 -   [x] Pact agreement is signed/accepted. (H, generated keys, not Nimiq Pay wallets)
 -   [x] Contributor submits evidence. (H)
 -   [x] Brand approves or requests revisions. (H: both paths)
--   [ ] Payment is sent using the supported integration.
--   [ ] Server verifies transaction details and confirmation.
+-   [x] Payment is sent using the supported integration. (TX 9f62a541…, 10 NIM)
+-   [x] Server verifies transaction details and confirmation. (CONFIRMED by verifier; re-checked on chain)
 -   [ ] Both users see correct final status.
 -   [x] No duplicate payout or unauthorized status change is possible. (U + H negatives)
 
@@ -548,7 +548,7 @@ failed; record the failure and next fix.
 
 ### Gate D --- Real usage and submission
 
--   [ ] Two-wallet end-to-end test documented.
+-   [x] Two-wallet end-to-end test documented. (2026-10-24 log entry; submission/revision not in the live run)
 -   [ ] Real user tests conducted and feedback recorded.
 -   [ ] Findings fixed or explicitly triaged.
 -   [ ] Public progress and community promotion log updated.
@@ -585,6 +585,26 @@ older entries to make progress look better.
     experience and prioritize a full two-wallet end-to-end test.
 
 ### Add future entries below
+
+#### 2026-10-24 --- Live two-phone run recorded (owner-reported, evidence checked)
+
+-   Owner report: the end-to-end flow was run on two phones inside Nimiq Pay and worked.
+-   Evidence checked by query (production Supabase, read-only) and on chain:
+    -   1 invite-only campaign; its 1 invitation is ACCEPTED; 1 claim linked to an agreement.
+    -   That agreement has **both seals** recorded.
+    -   1 real payment **CONFIRMED** (NIM, 1,000,000 Luna = 10 NIM), tx hash
+        `9f62a541bf9b4ee3b77aeced680c8f25ab81562c10dcba3c8abd4764f04ffec0`, written 2026-10-22
+        14:01 UTC, with one PAYMENT_CONFIRMED activity; recipient is the agreement's provider.
+        CONFIRMED can only be written by the server verifier (lib/api/reconcile.ts).
+    -   Independent check against rpc.nimiqwatch.com `getTransactionByHash`: value 1000000,
+        executionResult true, networkId 24 (mainnet), memo `PACT:TQVTXK6K:full` matches the
+        stored memo, block 64885614, 156,987 confirmations at check time.
+-   Environment: **NP + TX** (Nimiq Pay, two real wallets, real mainnet transaction).
+-   Not exercised in this live run: work submission, revision request and approval (the
+    agreement has 0 deliverables — payment was made straight after signing). These paths
+    are covered by H (52/52) but not yet live. USDT remains fixtures only.
+-   Next action: one more live run that includes submit → request changes → resubmit →
+    approve before paying; optionally a small USDT payment on Polygon.
 
 #### 2026-10-22 --- Public/private campaigns, handles, invitations, light theme, landing
 
