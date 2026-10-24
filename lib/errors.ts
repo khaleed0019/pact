@@ -25,7 +25,6 @@ export type ErrorCode =
   | 'NOT_SIGNED_IN'
   | 'VALIDATION'
   | 'AI_UNAVAILABLE'
-  | 'RATE_LIMITED'
   | 'SERVER'
   | 'UNKNOWN'
 
@@ -136,11 +135,6 @@ const CATALOG: Record<ErrorCode, Omit<UserFacingError, 'code'>> = {
     body: 'PACT could not reach the AI service, so it fell back to its built-in reader. You can still edit every field yourself.',
     retry: true,
     benign: true,
-  },
-  RATE_LIMITED: {
-    title: 'Slow down a little',
-    body: 'That action was tried too many times in a short while. Wait a minute and try again.',
-    retry: true,
   },
   SERVER: { title: 'PACT had a problem', body: 'Something failed on our side. Nothing was lost — try again.', retry: true },
   UNKNOWN: { title: 'That did not work', body: 'PACT hit an unexpected problem. Try again in a moment.', retry: true },

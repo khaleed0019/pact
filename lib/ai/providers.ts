@@ -12,7 +12,7 @@ import 'server-only'
  * tier). Neither key is ever sent to the browser: this module is `server-only`.
  */
 
-export type Backend = 'near-ai' | 'gemini' | 'anthropic' | 'none'
+export type Backend = 'gemini' | 'anthropic' | 'none'
 
 /** Google publishes this under several env names depending on the SDK people came from. */
 function geminiKey(): string | undefined {
@@ -25,9 +25,6 @@ function geminiKey(): string | undefined {
 }
 
 export function activeBackend(): Backend {
-  // NEAR AI Cloud first when configured: it is the hosted, private-inference option the
-  // NEAR integration is built around. Unset, selection is exactly as before.
-  if (process.env.NEAR_AI_API_KEY) return 'near-ai'
   if (geminiKey()) return 'gemini'
   if (process.env.ANTHROPIC_API_KEY) return 'anthropic'
   return 'none'
@@ -144,57 +141,6 @@ async function askGemini(request: JsonRequest): Promise<unknown | null> {
   }
 }
 
-// --- NEAR AI Cloud -------------------------------------------------------------------
-
-/**
- * NEAR AI Cloud exposes an OpenAI-compatible Chat Completions API at
- * https://cloud-api.near.ai/v1 with bearer auth, and documents tool calling on it
- * (docs.near.ai/cloud/guides/openai-compatibility, checked 2026-10-24). A forced function
- * call is how we get one JSON object back, as with Anthropic. The model id is
- * configurable; the default is the one used in NEAR's own quickstart examples.
- */
-async function askNearAi(request: JsonRequest): Promise<unknown | null> {
-  const key = process.env.NEAR_AI_API_KEY
-  if (!key) return null
-
-  const response = await fetch(`${process.env.NEAR_AI_BASE_URL || 'https://cloud-api.near.ai/v1'}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-    signal: withTimeout(),
-    body: JSON.stringify({
-      model: process.env.NEAR_AI_MODEL || 'zai-org/GLM-5.1-FP8',
-      temperature: 0.2,
-      max_tokens: 2048,
-      messages: [
-        { role: 'system', content: request.system },
-        { role: 'user', content: request.prompt },
-      ],
-      tools: [
-        { type: 'function', function: { name: request.toolName, description: request.toolDescription, parameters: request.schema } },
-      ],
-      tool_choice: { type: 'function', function: { name: request.toolName } },
-    }),
-  })
-
-  if (!response.ok) {
-    console.warn(`[pact] near ai responded ${response.status}; using built-in reader`)
-    return null
-  }
-
-  const payload = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string | null; tool_calls?: Array<{ function?: { arguments?: string } }> } }>
-  }
-  const message = payload.choices?.[0]?.message
-  const text = message?.tool_calls?.[0]?.function?.arguments ?? message?.content ?? ''
-  if (!text.trim()) return null
-  try {
-    return JSON.parse(text)
-  } catch {
-    console.warn('[pact] near ai returned unparseable JSON; using built-in reader')
-    return null
-  }
-}
-
 // --- Anthropic -----------------------------------------------------------------------
 
 async function askAnthropic(request: JsonRequest): Promise<unknown | null> {
@@ -241,7 +187,6 @@ export async function askForJson(request: JsonRequest): Promise<unknown | null> 
   if (backend === 'none') return null
 
   try {
-    if (backend === 'near-ai') return await askNearAi(request)
     return backend === 'gemini' ? await askGemini(request) : await askAnthropic(request)
   } catch (cause) {
     console.warn('[pact] model call failed; using built-in reader', cause)
