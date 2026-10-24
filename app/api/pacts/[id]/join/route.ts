@@ -3,6 +3,7 @@ import { getRepository } from '@/lib/db'
 import { authed, body, fail, ok } from '@/lib/api/handler'
 import { joinSchema } from '@/lib/api/schema'
 import { loadPact } from '@/lib/api/pact-helpers'
+import { resolvePartyName } from '@/lib/pact/names'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,14 +31,15 @@ export async function POST(request: Request, context: Context): Promise<NextResp
       await repo.acceptInvitation(input.token, session.address)
     }
 
-    const updated = await repo.joinPact(id, session.address, input.displayName)
+    const displayName = resolvePartyName(input.displayName, (await repo.getTrustMetrics(session.address)).displayName, session.address)
+    const updated = await repo.joinPact(id, session.address, displayName)
 
     await repo.addActivity({
       pactId: id,
       kind: 'PACT_SENT',
       actorAddress: session.address,
-      actorName: input.displayName,
-      summary: `${input.displayName} opened this agreement`,
+      actorName: displayName,
+      summary: `${displayName} opened this agreement`,
     })
 
     return ok({ pact: updated, previousStatus: pact.status })

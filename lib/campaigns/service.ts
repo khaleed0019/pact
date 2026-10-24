@@ -2,6 +2,7 @@ import type { Repository } from '../db/repo.ts'
 import { RepoError } from '../db/repo.ts'
 import { isValidAddress, normalizeAddress } from '../nimiq/address.ts'
 import { handleProblem, normalizeHandle } from '../pact/handles.ts'
+import { resolvePartyName } from '../pact/names.ts'
 import { SLOT_RELEASING, summariseBudget } from './model.ts'
 import type { BudgetSummary, Campaign, CampaignClaim, CampaignInvitation } from './model.ts'
 import type { CampaignStore, ClaimRecord, CreateCampaignInput } from './store.ts'
@@ -73,7 +74,8 @@ export async function canViewCampaign(store: CampaignStore, campaign: Campaign, 
 /** Post a campaign. Brands only — checked against storage, not the request. */
 export async function postCampaign(repo: Repository, store: CampaignStore, input: CreateCampaignInput): Promise<Campaign> {
   await assertRole(repo, input.ownerAddress, ROLE_REQUIRED.postCampaign)
-  return store.createCampaign(input)
+  const ownerName = resolvePartyName(input.ownerName, (await repo.getTrustMetrics(input.ownerAddress)).displayName, input.ownerAddress)
+  return store.createCampaign({ ...input, ownerName })
 }
 
 export type InviteTarget = { handle: string } | { address: string }
@@ -229,6 +231,8 @@ export async function claimCampaign(
   }
 
   const claim = await store.reserveSlot(campaign.id, input.jobberAddress, input.today)
+  // Never store a pronoun as a party's name: the brand would read "You" as the contributor.
+  const jobberName = resolvePartyName(input.jobberName, (await repo.getTrustMetrics(input.jobberAddress)).displayName, input.jobberAddress)
 
   let pact: PactDetail
   try {
@@ -237,7 +241,7 @@ export async function claimCampaign(
       createdBy: input.jobberAddress,
       category: 'FREELANCE',
       creatorRole: 'PROVIDER',
-      creatorName: input.jobberName,
+      creatorName: jobberName,
       counterpartyName: campaign.ownerName,
       counterpartyAddress: campaign.ownerAddress,
       title: campaign.title,

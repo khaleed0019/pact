@@ -287,3 +287,16 @@ test('dashboards are counted from records, per currency, and never call sent "pa
   assert.equal(alice.verified.NIM ?? '0', '0', 'sent is pending, not earned')
   assert.equal((await brandDashboard(repo, store, BRAND)).pending.NIM, '40000000')
 })
+
+test('a pronoun is never stored as a party’s name on the agreement', async () => {
+  const { make, claim, repo } = setup()
+  const c = await make()
+  const { pact } = await claim(c.id, ALICE, 'You')
+  const provider = pact.participants.find((p) => p.role === 'PROVIDER')!
+  assert.notEqual(provider.displayName, 'You', 'the brand must not see the contributor named "You"')
+  assert.match(provider.displayName, /…/, 'with no saved name, the short wallet address is used')
+
+  await repo.updateProfile(BOB, 'Bob')
+  const second = await claim(c.id, BOB, 'me')
+  assert.equal(second.pact.participants.find((p) => p.role === 'PROVIDER')!.displayName, 'Bob', 'the saved profile name wins over a placeholder')
+})

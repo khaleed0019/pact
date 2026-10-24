@@ -67,7 +67,8 @@ export const createPactSchema = z
     title: text(140),
     deliverable: text(2000),
     creatorRole: z.enum(['CLIENT', 'PROVIDER']),
-    creatorName: text(80),
+    // May be blank: the server fills in the saved profile name or the short address.
+    creatorName: optionalText(80),
     counterpartyName: text(80),
     counterpartyAddress: nimiqAddress.nullable().default(null),
     currency: z.enum(CURRENCIES),

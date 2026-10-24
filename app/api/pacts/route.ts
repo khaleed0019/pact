@@ -4,6 +4,7 @@ import { authed, body, fail, ok } from '@/lib/api/handler'
 import { createPactSchema } from '@/lib/api/schema'
 import { splitByPercent, sumMinor } from '@/lib/pact/money'
 import type { EvmChainKey } from '@/lib/pact/types'
+import { resolvePartyName } from '@/lib/pact/names'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,11 +36,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const repo = getRepository()
+    // The creator's name is shown to the other side, so a placeholder like "You" is replaced.
+    const creatorName = resolvePartyName(input.creatorName, (await repo.getTrustMetrics(session.address)).displayName, session.address)
     const pact = await repo.createPact({
       createdBy: session.address,
       category: input.category,
       creatorRole: input.creatorRole,
-      creatorName: input.creatorName,
+      creatorName,
       counterpartyName: input.counterpartyName,
       counterpartyAddress: input.counterpartyAddress,
       title: input.title,

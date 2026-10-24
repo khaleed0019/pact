@@ -37,7 +37,8 @@ export async function GET(): Promise<NextResponse> {
       signedIn: true,
       address: session.address,
       demo: session.encoding === 'demo',
-      displayName: trust.displayName || 'You',
+      // Empty when not set, so the app asks for a real name instead of storing a placeholder.
+      displayName: trust.displayName,
       // null means "not chosen yet" and sends the client to the role screen.
       role,
       handle: profile.handle,

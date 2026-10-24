@@ -98,7 +98,7 @@ export default function NewPactPage() {
         title: extraction.title || 'Untitled agreement',
         deliverable: extraction.deliverable || description,
         creatorRole: extraction.authorRole,
-        creatorName: (extraction.authorRole === 'CLIENT' ? extraction.clientName : extraction.providerName) || me?.displayName || 'You',
+        creatorName: (extraction.authorRole === 'CLIENT' ? extraction.clientName : extraction.providerName) || me?.displayName || '',
         counterpartyName:
           (extraction.authorRole === 'CLIENT' ? extraction.providerName : extraction.clientName) || 'Other party',
         counterpartyAddress: '',
@@ -236,7 +236,7 @@ export default function NewPactPage() {
           title: draft.title,
           deliverable: draft.deliverable,
           creatorRole: draft.creatorRole,
-          creatorName: draft.creatorName || me?.displayName || 'You',
+          creatorName: draft.creatorName || me?.displayName || '',
           counterpartyName: draft.counterpartyName,
           counterpartyAddress: draft.counterpartyAddress.trim() || null,
           category,
